@@ -1,0 +1,25 @@
+{
+    "name": "feedback-system-backend",
+    "version": "1.0.0",
+    "description": "QR-based feedback system backend",
+    "main": "server.js",
+    "type": "module",
+    "scripts": {
+        "dev": "nodemon server.js",
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.1",
+        "express": "^4.18.2",
+        "express-rate-limit": "^7.1.5",
+        "jsonwebtoken": "^9.0.2",
+        "qrcode": "^1.5.3",
+        "sql.js": "^1.10.0",
+        "uuid": "^9.0.1"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.3"
+    }
+}
