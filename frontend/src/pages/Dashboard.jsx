@@ -26,17 +26,29 @@ export default function Dashboard() {
         if (showLoading) setLoading(true)
         try {
             const token = getToken()
+            if (!token || !user?.businessId) {
+                setLoading(false)
+                return
+            }
+
             const headers = { 'Authorization': `Bearer ${token}` }
 
             // Fetch stats
             const statsRes = await fetch(`/api/business/${user.businessId}/stats?filter=${filter}`, { headers })
-            const statsData = await statsRes.json()
-            setStats(statsData)
+            if (statsRes.ok) {
+                const statsData = await statsRes.json()
+                setStats(statsData)
+            } else if (statsRes.status === 403 || statsRes.status === 404) {
+                console.log('Session invalid, please login again')
+                return
+            }
 
             // Fetch negative feedbacks
             const feedbackRes = await fetch(`/api/feedback/${user.businessId}?filter=${filter}&type=negative`, { headers })
-            const feedbackData = await feedbackRes.json()
-            setFeedbacks(feedbackData.feedbacks || [])
+            if (feedbackRes.ok) {
+                const feedbackData = await feedbackRes.json()
+                setFeedbacks(feedbackData.feedbacks || [])
+            }
 
             setLastUpdated(new Date())
         } catch (error) {

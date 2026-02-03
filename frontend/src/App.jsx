@@ -84,6 +84,11 @@ function AppRoutes() {
                     <QRCode />
                 </ProtectedRoute>
             } />
+            <Route path="/qr" element={
+                <ProtectedRoute>
+                    <QRCode />
+                </ProtectedRoute>
+            } />
             <Route path="/settings" element={
                 <ProtectedRoute>
                     <Settings />

@@ -1,40 +1,35 @@
 import express from 'express';
 import QRCode from 'qrcode';
-import { dbHelpers } from '../db/connection.js';
+import { supabase } from '../db/supabase.js';
 import { authenticate } from '../middleware/auth.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const router = express.Router();
-
-// Frontend URL for generating feedback links
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8000';
-console.log('📱 QR Code URLs will use:', FRONTEND_URL);
+
+console.log('Frontend URL for QR:', FRONTEND_URL);
 
 /**
  * GET /api/business/:id
  * Get business info (public - for feedback page)
  */
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
 
-        const business = dbHelpers.prepare(`
-            SELECT id, name, category, logo_url, google_review_url, created_at
-            FROM businesses
-            WHERE id = ?
-        `).get(id);
+        const { data: business, error } = await supabase
+            .from('businesses')
+            .select('id, name, category, logo_url, google_review_url')
+            .eq('id', id)
+            .single();
 
-        if (!business) {
+        if (error || !business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
-        res.json({
-            id: business.id,
-            name: business.name,
-            category: business.category,
-            logoUrl: business.logo_url,
-            googleReviewUrl: business.google_review_url,
-            createdAt: business.created_at
-        });
+        res.json(business);
     } catch (error) {
         console.error('Get business error:', error);
         res.status(500).json({ error: 'Failed to get business info' });
@@ -45,59 +40,33 @@ router.get('/:id', (req, res) => {
  * PUT /api/business/:id
  * Update business info (authenticated)
  */
-router.put('/:id', authenticate, (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { businessId } = req.user;
+        const { name, category, googleReviewUrl, logoUrl } = req.body;
 
         // Verify user owns this business
         if (id !== businessId) {
             return res.status(403).json({ error: 'Not authorized to update this business' });
         }
 
-        const { name, category, logoUrl, googleReviewUrl } = req.body;
+        const updates = {};
+        if (name) updates.name = name;
+        if (category) updates.category = category;
+        if (googleReviewUrl) updates.google_review_url = googleReviewUrl;
+        if (logoUrl !== undefined) updates.logo_url = logoUrl;
 
-        // Build update query dynamically
-        const updates = [];
-        const values = [];
+        const { error } = await supabase
+            .from('businesses')
+            .update(updates)
+            .eq('id', id);
 
-        if (name) {
-            updates.push('name = ?');
-            values.push(name);
-        }
-        if (category) {
-            updates.push('category = ?');
-            values.push(category);
-        }
-        if (logoUrl !== undefined) {
-            updates.push('logo_url = ?');
-            values.push(logoUrl);
-        }
-        if (googleReviewUrl) {
-            updates.push('google_review_url = ?');
-            values.push(googleReviewUrl);
+        if (error) {
+            return res.status(500).json({ error: 'Failed to update business' });
         }
 
-        if (updates.length === 0) {
-            return res.status(400).json({ error: 'No fields to update' });
-        }
-
-        values.push(id);
-        dbHelpers.prepare(`UPDATE businesses SET ${updates.join(', ')} WHERE id = ?`).run(...values);
-
-        // Return updated business
-        const business = dbHelpers.prepare('SELECT * FROM businesses WHERE id = ?').get(id);
-
-        res.json({
-            message: 'Business updated successfully',
-            business: {
-                id: business.id,
-                name: business.name,
-                category: business.category,
-                logoUrl: business.logo_url,
-                googleReviewUrl: business.google_review_url
-            }
-        });
+        res.json({ message: 'Business updated successfully' });
     } catch (error) {
         console.error('Update business error:', error);
         res.status(500).json({ error: 'Failed to update business' });
@@ -106,7 +75,7 @@ router.put('/:id', authenticate, (req, res) => {
 
 /**
  * GET /api/business/:id/qr
- * Generate QR code for feedback page (authenticated)
+ * Generate QR code for feedback (authenticated)
  */
 router.get('/:id/qr', authenticate, async (req, res) => {
     try {
@@ -118,8 +87,13 @@ router.get('/:id/qr', authenticate, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        const business = dbHelpers.prepare('SELECT name FROM businesses WHERE id = ?').get(id);
-        if (!business) {
+        const { data: business, error } = await supabase
+            .from('businesses')
+            .select('id, name')
+            .eq('id', id)
+            .single();
+
+        if (error || !business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -127,8 +101,8 @@ router.get('/:id/qr', authenticate, async (req, res) => {
         const feedbackUrl = `${FRONTEND_URL}/b/${id}`;
 
         // Generate QR code as data URL
-        const qrCodeDataUrl = await QRCode.toDataURL(feedbackUrl, {
-            width: 400,
+        const qrCode = await QRCode.toDataURL(feedbackUrl, {
+            width: 512,
             margin: 2,
             color: {
                 dark: '#000000',
@@ -137,8 +111,8 @@ router.get('/:id/qr', authenticate, async (req, res) => {
         });
 
         res.json({
+            qrCode,
             feedbackUrl,
-            qrCode: qrCodeDataUrl,
             businessName: business.name
         });
     } catch (error) {
@@ -151,51 +125,51 @@ router.get('/:id/qr', authenticate, async (req, res) => {
  * GET /api/business/:id/stats
  * Get feedback statistics (authenticated)
  */
-router.get('/:id/stats', authenticate, (req, res) => {
+router.get('/:id/stats', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { businessId } = req.user;
+        const { filter } = req.query;
 
-        // Verify user owns this business
         if (id !== businessId) {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        const { filter } = req.query; // today, week, month, all
-
-        // Calculate date filter
+        // Build date filter
         let dateFilter = '';
         const now = new Date();
 
-        switch (filter) {
-            case 'today':
-                dateFilter = `AND date(created_at) = date('now', 'localtime')`;
-                break;
-            case 'week':
-                dateFilter = `AND created_at >= datetime('now', '-7 days', 'localtime')`;
-                break;
-            case 'month':
-                dateFilter = `AND created_at >= datetime('now', '-30 days', 'localtime')`;
-                break;
-            default:
-                dateFilter = '';
+        if (filter === 'today') {
+            dateFilter = now.toISOString().split('T')[0];
+        } else if (filter === 'week') {
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            dateFilter = weekAgo.toISOString();
+        } else if (filter === 'month') {
+            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            dateFilter = monthAgo.toISOString();
         }
 
-        // Get stats
-        const stats = dbHelpers.prepare(`
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN is_positive = 1 THEN 1 ELSE 0 END) as positive,
-                SUM(CASE WHEN is_positive = 0 THEN 1 ELSE 0 END) as negative
-            FROM feedbacks 
-            WHERE business_id = ? ${dateFilter}
-        `).get(id);
+        // Build query
+        let query = supabase
+            .from('feedbacks')
+            .select('is_positive')
+            .eq('business_id', id);
 
-        res.json({
-            total: stats.total || 0,
-            positive: stats.positive || 0,
-            negative: stats.negative || 0
-        });
+        if (dateFilter) {
+            query = query.gte('created_at', dateFilter);
+        }
+
+        const { data: feedbacks, error } = await query;
+
+        if (error) {
+            return res.status(500).json({ error: 'Failed to get statistics' });
+        }
+
+        const total = feedbacks?.length || 0;
+        const positive = feedbacks?.filter(f => f.is_positive).length || 0;
+        const negative = total - positive;
+
+        res.json({ total, positive, negative });
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).json({ error: 'Failed to get statistics' });
@@ -206,22 +180,22 @@ router.get('/:id/stats', authenticate, (req, res) => {
  * GET /api/business/:id/plan
  * Get subscription plan info (authenticated)
  */
-router.get('/:id/plan', authenticate, (req, res) => {
+router.get('/:id/plan', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { businessId } = req.user;
 
-        // Verify user owns this business
         if (id !== businessId) {
             return res.status(403).json({ error: 'Not authorized to access this business' });
         }
 
-        const business = dbHelpers.prepare(`
-            SELECT subscription_plan, monthly_feedback_limit, monthly_feedback_count, last_reset_date
-            FROM businesses WHERE id = ?
-        `).get(id);
+        const { data: business, error } = await supabase
+            .from('businesses')
+            .select('subscription_plan, monthly_feedback_limit, monthly_feedback_count, last_reset_date')
+            .eq('id', id)
+            .single();
 
-        if (!business) {
+        if (error || !business) {
             return res.status(404).json({ error: 'Business not found' });
         }
 
@@ -245,11 +219,12 @@ router.get('/:id/plan', authenticate, (req, res) => {
         res.status(500).json({ error: 'Failed to get plan info' });
     }
 });
+
 /**
  * GET /api/business/:id/alerts
  * Get unread feedback count and new negative feedbacks (for extension)
  */
-router.get('/:id/alerts', authenticate, (req, res) => {
+router.get('/:id/alerts', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { businessId } = req.user;
@@ -259,20 +234,25 @@ router.get('/:id/alerts', authenticate, (req, res) => {
         }
 
         // Get unread negative feedback count
-        const unreadResult = dbHelpers.prepare(`
-            SELECT COUNT(*) as count FROM feedbacks 
-            WHERE business_id = ? AND is_positive = 0 AND (notified IS NULL OR notified = 0)
-        `).get(id);
+        const { data: unreadFeedbacks, error: countError } = await supabase
+            .from('feedbacks')
+            .select('id')
+            .eq('business_id', id)
+            .eq('is_positive', false)
+            .eq('notified', false);
 
-        // Get new negative feedbacks that haven't been notified
-        const newNegative = dbHelpers.prepare(`
-            SELECT id, rating, message, created_at FROM feedbacks 
-            WHERE business_id = ? AND is_positive = 0 AND (notified IS NULL OR notified = 0)
-            ORDER BY created_at DESC LIMIT 5
-        `).all(id);
+        // Get new negative feedbacks
+        const { data: newNegative, error: feedbackError } = await supabase
+            .from('feedbacks')
+            .select('id, rating, message, created_at')
+            .eq('business_id', id)
+            .eq('is_positive', false)
+            .eq('notified', false)
+            .order('created_at', { ascending: false })
+            .limit(5);
 
         res.json({
-            unreadCount: unreadResult?.count || 0,
+            unreadCount: unreadFeedbacks?.length || 0,
             newNegative: newNegative || []
         });
     } catch (error) {
@@ -285,7 +265,7 @@ router.get('/:id/alerts', authenticate, (req, res) => {
  * POST /api/business/:id/alerts/mark-notified
  * Mark feedbacks as notified (for extension)
  */
-router.post('/:id/alerts/mark-notified', authenticate, (req, res) => {
+router.post('/:id/alerts/mark-notified', authenticate, async (req, res) => {
     try {
         const { id } = req.params;
         const { businessId } = req.user;
@@ -299,12 +279,15 @@ router.post('/:id/alerts/mark-notified', authenticate, (req, res) => {
             return res.status(400).json({ error: 'feedbackIds array required' });
         }
 
-        // Mark as notified
-        const placeholders = feedbackIds.map(() => '?').join(',');
-        dbHelpers.prepare(`
-            UPDATE feedbacks SET notified = 1 
-            WHERE id IN (${placeholders}) AND business_id = ?
-        `).run(...feedbackIds, id);
+        const { error } = await supabase
+            .from('feedbacks')
+            .update({ notified: true })
+            .in('id', feedbackIds)
+            .eq('business_id', id);
+
+        if (error) {
+            return res.status(500).json({ error: 'Failed to mark as notified' });
+        }
 
         res.json({ success: true, marked: feedbackIds.length });
     } catch (error) {

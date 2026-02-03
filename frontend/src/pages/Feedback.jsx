@@ -50,13 +50,12 @@ export default function Feedback() {
         setError(null)
 
         try {
-            const response = await fetch('/api/feedback', {
+            const response = await fetch(`/api/feedback/${businessId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    businessId,
                     rating,
                     message: message.trim()
                 })

@@ -5,8 +5,8 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Import database initialization
-import { initDatabase } from './db/connection.js';
+// Import Supabase client (replaces SQLite)
+import './db/supabase.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -14,15 +14,14 @@ import businessRoutes from './routes/business.js';
 import feedbackRoutes from './routes/feedback.js';
 
 // Import middleware
-import { authenticate } from './middleware/auth.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 8080;
 
 // CORS configuration
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:8000',
     credentials: true
 }));
 
@@ -34,7 +33,7 @@ app.use('/api', apiLimiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.json({ status: 'ok', database: 'supabase', timestamp: new Date().toISOString() });
 });
 
 // Public routes
@@ -53,26 +52,16 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Not found' });
 });
 
-// Initialize database and start server
-async function startServer() {
-    try {
-        await initDatabase();
-
-        app.listen(PORT, () => {
-            console.log(`
+// Start server (no database initialization needed - Supabase is cloud-based)
+app.listen(PORT, () => {
+    console.log(`
 ╔════════════════════════════════════════════════════════╗
-║     🚀 Feedback System Backend Running!                ║
+║     🚀 Feedback System Backend (Supabase)             ║
 ║                                                        ║
 ║     Server:    http://localhost:${PORT}                   ║
 ║     Health:    http://localhost:${PORT}/health             ║
+║     Database:  Supabase PostgreSQL (Cloud)            ║
 ║                                                        ║
 ╚════════════════════════════════════════════════════════╝
-            `);
-        });
-    } catch (error) {
-        console.error('Failed to start server:', error);
-        process.exit(1);
-    }
-}
-
-startServer();
+    `);
+});

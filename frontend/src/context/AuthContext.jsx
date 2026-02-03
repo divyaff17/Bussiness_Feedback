@@ -8,11 +8,14 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
 
-    // Check for existing token on mount
+    // On mount: Check for existing session
     useEffect(() => {
-        const token = localStorage.getItem('token')
+        // First, clear any old localStorage data from SQLite era
+        localStorage.clear()
+
+        // Check sessionStorage for current session token
+        const token = sessionStorage.getItem('token')
         if (token) {
-            // Verify token and get user info
             fetchUserInfo(token)
         } else {
             setLoading(false)
@@ -31,12 +34,15 @@ export function AuthProvider({ children }) {
                 const userData = await response.json()
                 setUser(userData)
             } else {
-                // Token invalid, remove it
-                localStorage.removeItem('token')
+                // Invalid session - clear and redirect
+                console.log('Session invalid, clearing...')
+                sessionStorage.clear()
+                setUser(null)
             }
         } catch (error) {
-            console.error('Failed to fetch user info:', error)
-            localStorage.removeItem('token')
+            console.error('Auth error:', error)
+            sessionStorage.clear()
+            setUser(null)
         } finally {
             setLoading(false)
         }
@@ -45,9 +51,7 @@ export function AuthProvider({ children }) {
     const login = async (email, password) => {
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
         })
 
@@ -57,7 +61,8 @@ export function AuthProvider({ children }) {
             throw new Error(data.error || 'Login failed')
         }
 
-        localStorage.setItem('token', data.token)
+        // Store token in sessionStorage (not localStorage)
+        sessionStorage.setItem('token', data.token)
         setUser(data.user)
         return data
     }
@@ -65,9 +70,7 @@ export function AuthProvider({ children }) {
     const signup = async (userData) => {
         const response = await fetch(`${API_URL}/auth/signup`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
         })
 
@@ -77,17 +80,19 @@ export function AuthProvider({ children }) {
             throw new Error(data.error || 'Signup failed')
         }
 
-        localStorage.setItem('token', data.token)
+        // Store token in sessionStorage (not localStorage)
+        sessionStorage.setItem('token', data.token)
         setUser(data.user)
         return data
     }
 
     const logout = useCallback(() => {
-        localStorage.removeItem('token')
+        sessionStorage.clear()
+        localStorage.clear() // Also clear any old data
         setUser(null)
     }, [])
 
-    const getToken = () => localStorage.getItem('token')
+    const getToken = () => sessionStorage.getItem('token')
 
     const value = {
         user,

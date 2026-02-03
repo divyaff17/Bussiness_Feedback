@@ -1,20 +1,27 @@
 # Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Environment files
+# Environment files (contain secrets!)
 .env
 .env.local
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 
-# Database
-*.db
-
-# Build output
+# Build outputs
 dist/
+build/
+
+# Database files (local SQLite)
+*.db
+*.sqlite
 
 # Logs
-*.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS files
 .DS_Store
@@ -23,3 +30,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Testing
+coverage/

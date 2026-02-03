@@ -26,13 +26,13 @@ export const authenticate = (req, res, next) => {
 
 /**
  * Generate JWT token for user
+ * @param {Object} payload - { userId, businessId }
  */
-export const generateToken = (user) => {
+export const generateToken = (payload) => {
     return jwt.sign(
         {
-            userId: user.id,
-            email: user.email,
-            businessId: user.business_id
+            userId: payload.userId,
+            businessId: payload.businessId
         },
         JWT_SECRET,
         { expiresIn: '7d' }

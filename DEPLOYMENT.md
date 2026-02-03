@@ -1,144 +1,82 @@
-# Deployment Guide - QR Feedback System
+# Feedback System - Deployment Guide
 
-## Architecture Overview
+## Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│     Vercel      │     │    Railway      │     │   SQLite DB     │
-│   (Frontend)    │────▶│   (Backend)     │────▶│  (on Railway)   │
-│  React + Vite   │     │  Node/Express   │     │                 │
+│   Vercel        │────▶│   Railway       │────▶│   Supabase      │
+│   Frontend      │     │   Backend       │     │   Database      │
+│   (React)       │     │   (Express)     │     │   (PostgreSQL)  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
----
+## Step 1: Set up Supabase Database
 
-## Step 1: Deploy Backend on Railway
+1. Go to [Supabase](https://supabase.com) and create a new project
+2. Go to **SQL Editor** → **New Query**
+3. Copy the content from `backend/db/supabase_schema.sql`
+4. Click **Run** to create tables
 
-### 1.1 Create Railway Account
-1. Go to [railway.app](https://railway.app)
-2. Sign up with GitHub
+## Step 2: Deploy Backend to Railway
 
-### 1.2 Create New Project
-1. Click **"New Project"**
-2. Select **"Deploy from GitHub repo"**
-3. Choose your repository
-4. Select the `feedback-system/backend` folder
+1. Go to [Railway](https://railway.app) and create new project
+2. Connect your GitHub repository
+3. Set environment variables:
+   - `JWT_SECRET` - Strong random string
+   - `SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_ANON_KEY` - Your Supabase anon key
+   - `FRONTEND_URL` - Your Vercel frontend URL (e.g., https://your-app.vercel.app)
+   - `PORT` - 8080
 
-### 1.3 Set Environment Variables
-In Railway dashboard → Variables:
+4. Railway will automatically deploy from the `backend` folder
 
-| Variable | Value |
-|----------|-------|
-| `PORT` | `8080` |
-| `JWT_SECRET` | Generate with: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `FRONTEND_URL` | `https://your-app.vercel.app` (update after Vercel deploy) |
-| `DATABASE_PATH` | `./db/feedback.db` |
+## Step 3: Deploy Frontend to Vercel
 
-### 1.4 Get Your Backend URL
-After deploy, Railway gives you a URL like:
-```
-https://feedback-backend-production.up.railway.app
-```
-**Save this URL!**
+1. Go to [Vercel](https://vercel.com) and import your GitHub repository
+2. Set the root directory to `frontend`
+3. Set environment variables:
+   - `VITE_API_URL` - Your Railway backend URL (e.g., https://your-app.railway.app)
 
----
+4. Update `frontend/vite.config.js` for production proxy
 
-## Step 2: Deploy Frontend on Vercel
+## Step 4: Update QR Code URLs
 
-### 2.1 Update vercel.json
-Edit `frontend/vercel.json` and replace the backend URL:
+The QR code URL comes from the `FRONTEND_URL` environment variable in the backend.
 
-```json
-{
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://YOUR-RAILWAY-URL/api/$1"
-    }
-  ]
-}
-```
+**Example:**
+- Development: `http://localhost:8000/b/{business_id}`
+- Production: `https://your-app.vercel.app/b/{business_id}`
 
-### 2.2 Deploy to Vercel
-1. Go to [vercel.com](https://vercel.com)
-2. Sign up with GitHub
-3. Click **"Import Project"**
-4. Select your repository
-5. Set **Root Directory** to `feedback-system/frontend`
-6. Click **Deploy**
+Make sure `FRONTEND_URL` in Railway matches your Vercel deployment URL!
 
-### 2.3 Get Your Frontend URL
-Vercel gives you a URL like:
-```
-https://feedback-app.vercel.app
-```
+## Environment Variables Summary
 
----
+### Backend (Railway)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| JWT_SECRET | JWT signing key | `super-secret-key-123` |
+| SUPABASE_URL | Supabase project URL | `https://abc.supabase.co` |
+| SUPABASE_ANON_KEY | Supabase anon key | `eyJhbGc...` |
+| FRONTEND_URL | Vercel frontend URL | `https://app.vercel.app` |
+| PORT | Server port | `8080` |
 
-## Step 3: Update Backend FRONTEND_URL
+### Frontend (Vercel)
+| Variable | Description | Example |
+|----------|-------------|---------|
+| VITE_API_URL | Railway backend URL | `https://app.railway.app` |
 
-Go back to Railway and update the environment variable:
+## Testing QR Codes
 
-```
-FRONTEND_URL=https://feedback-app.vercel.app
-```
+1. Sign up on your production site
+2. Go to QR Code page
+3. The QR code should point to: `https://your-vercel-app.vercel.app/b/{business_id}`
+4. Scan with your phone - it should open the feedback form!
 
-This ensures QR codes generate the correct production URL.
+## Database Schema
 
----
+The Supabase database has 3 tables:
+- `businesses` - Business info (name, category, google_review_url)
+- `users` - Business owner login credentials
+- `feedbacks` - Customer feedback data
 
-## Step 4: Test Production
-
-1. **Open**: `https://your-app.vercel.app`
-2. **Sign up** a new business
-3. **Go to QR Code page** - URL should be `https://your-app.vercel.app/b/...`
-4. **Scan QR** from mobile - should work from anywhere!
-
----
-
-## Troubleshooting
-
-### API calls failing?
-- Check Railway logs for errors
-- Verify FRONTEND_URL in Railway matches your Vercel URL
-- Check CORS is configured correctly
-
-### Database not persisting?
-- Railway's ephemeral storage resets on redeploy
-- For production, consider upgrading to Railway's persistent storage or using PostgreSQL
-
-### QR codes showing wrong URL?
-- Restart Railway after updating FRONTEND_URL
-- Clear browser cache and regenerate QR
-
----
-
-## Custom Domain (Optional)
-
-### Vercel
-1. Go to Project Settings → Domains
-2. Add your domain: `feedback.yourbusiness.com`
-3. Update DNS as instructed
-
-### Railway
-1. Go to Settings → Networking
-2. Add custom domain
-3. Update DNS as instructed
-
-### Update FRONTEND_URL
-After adding custom domain, update Railway:
-```
-FRONTEND_URL=https://feedback.yourbusiness.com
-```
-
----
-
-## Production Checklist
-
-- [ ] Backend deployed on Railway
-- [ ] Frontend deployed on Vercel
-- [ ] FRONTEND_URL set to production URL
-- [ ] JWT_SECRET is strong and unique
-- [ ] QR codes generate production URLs
-- [ ] Mobile feedback flow tested
-- [ ] Dashboard shows live updates
+All linked by `business_id` - data is stored in cloud, not localStorage!
