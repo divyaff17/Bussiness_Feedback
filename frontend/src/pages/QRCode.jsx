@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { useAuth } from '../hooks/useAuth'
+import API_URL from '../config/api'
 
 export default function QRCode() {
     const { user, getToken, logout } = useAuth()
@@ -32,7 +33,7 @@ export default function QRCode() {
                 return
             }
 
-            const response = await fetch(`/api/business/${user.businessId}/qr`, {
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}/qr`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -174,8 +175,8 @@ export default function QRCode() {
                                 <button
                                     onClick={copyLink}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${copied
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
                                         }`}
                                 >
                                     {copied ? '✓ Copied!' : '📋 Copy'}

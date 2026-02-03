@@ -1,6 +1,7 @@
 import { createContext, useState, useEffect, useCallback } from 'react'
 
-const API_URL = '/api'
+// Use environment variable for production, empty string for development (Vite proxy)
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 export const AuthContext = createContext(null)
 
@@ -24,7 +25,7 @@ export function AuthProvider({ children }) {
 
     const fetchUserInfo = async (token) => {
         try {
-            const response = await fetch(`${API_URL}/auth/me`, {
+            const response = await fetch(`${API_URL}/api/auth/me`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -49,7 +50,7 @@ export function AuthProvider({ children }) {
     }
 
     const login = async (email, password) => {
-        const response = await fetch(`${API_URL}/auth/login`, {
+        const response = await fetch(`${API_URL}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -68,7 +69,7 @@ export function AuthProvider({ children }) {
     }
 
     const signup = async (userData) => {
-        const response = await fetch(`${API_URL}/auth/signup`, {
+        const response = await fetch(`${API_URL}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
@@ -94,13 +95,16 @@ export function AuthProvider({ children }) {
 
     const getToken = () => sessionStorage.getItem('token')
 
+    const getApiUrl = () => API_URL
+
     const value = {
         user,
         loading,
         login,
         signup,
         logout,
-        getToken
+        getToken,
+        getApiUrl
     }
 
     return (

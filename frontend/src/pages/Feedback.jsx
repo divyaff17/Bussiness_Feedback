@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import StarRating from '../components/StarRating'
+import API_URL from '../config/api'
 
 export default function Feedback() {
     const { businessId } = useParams()
@@ -19,7 +20,7 @@ export default function Feedback() {
 
     const fetchBusiness = async () => {
         try {
-            const response = await fetch(`/api/business/${businessId}`)
+            const response = await fetch(`${API_URL}/api/business/${businessId}`)
             if (!response.ok) {
                 throw new Error('Business not found')
             }
@@ -50,7 +51,7 @@ export default function Feedback() {
         setError(null)
 
         try {
-            const response = await fetch(`/api/feedback/${businessId}`, {
+            const response = await fetch(`${API_URL}/api/feedback/${businessId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

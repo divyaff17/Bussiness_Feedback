@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
+import API_URL from '../config/api'
 
 export default function Dashboard() {
     const { user, getToken } = useAuth()
@@ -34,7 +35,7 @@ export default function Dashboard() {
             const headers = { 'Authorization': `Bearer ${token}` }
 
             // Fetch stats
-            const statsRes = await fetch(`/api/business/${user.businessId}/stats?filter=${filter}`, { headers })
+            const statsRes = await fetch(`${API_URL}/api/business/${user.businessId}/stats?filter=${filter}`, { headers })
             if (statsRes.ok) {
                 const statsData = await statsRes.json()
                 setStats(statsData)
@@ -44,7 +45,7 @@ export default function Dashboard() {
             }
 
             // Fetch negative feedbacks
-            const feedbackRes = await fetch(`/api/feedback/${user.businessId}?filter=${filter}&type=negative`, { headers })
+            const feedbackRes = await fetch(`${API_URL}/api/feedback/${user.businessId}?filter=${filter}&type=negative`, { headers })
             if (feedbackRes.ok) {
                 const feedbackData = await feedbackRes.json()
                 setFeedbacks(feedbackData.feedbacks || [])

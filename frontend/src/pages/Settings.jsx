@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
+import API_URL from '../config/api'
 
 export default function Settings() {
     const { user, getToken } = useAuth()
@@ -33,7 +34,7 @@ export default function Settings() {
 
     const fetchBusinessInfo = async () => {
         try {
-            const response = await fetch(`/api/business/${user.businessId}`)
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}`)
             const data = await response.json()
             setFormData({
                 name: data.name || '',
@@ -62,7 +63,7 @@ export default function Settings() {
 
         try {
             const token = getToken()
-            const response = await fetch(`/api/business/${user.businessId}`, {
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

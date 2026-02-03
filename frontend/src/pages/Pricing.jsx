@@ -1,6 +1,7 @@
 import Layout from '../components/Layout'
 import { useAuth } from '../hooks/useAuth'
 import { useState, useEffect } from 'react'
+import API_URL from '../config/api'
 
 export default function Pricing() {
     const { user, getToken } = useAuth()
@@ -16,7 +17,7 @@ export default function Pricing() {
     const fetchPlanInfo = async () => {
         try {
             const token = getToken()
-            const response = await fetch(`/api/business/${user.businessId}/plan`, {
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}/plan`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
             if (response.ok) {
@@ -125,10 +126,10 @@ export default function Pricing() {
                             key={plan.name}
                             onClick={() => setSelectedPlan(plan.planId)}
                             className={`card relative cursor-pointer transition-all duration-200 hover:shadow-lg ${selectedPlan === plan.planId
-                                    ? 'ring-2 ring-blue-500 shadow-lg transform scale-[1.02]'
-                                    : plan.isPopular
-                                        ? 'ring-2 ring-purple-400'
-                                        : 'hover:ring-2 hover:ring-blue-300'
+                                ? 'ring-2 ring-blue-500 shadow-lg transform scale-[1.02]'
+                                : plan.isPopular
+                                    ? 'ring-2 ring-purple-400'
+                                    : 'hover:ring-2 hover:ring-blue-300'
                                 }`}
                         >
                             {plan.isPopular && (
