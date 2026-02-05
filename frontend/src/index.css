@@ -234,3 +234,45 @@ body {
 .shadow-glow {
     box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
 }
+
+/* Smooth page transitions */
+@keyframes pageIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.page-enter {
+    animation: pageIn 0.3s ease-out forwards;
+}
+
+/* Smooth link transitions */
+a, button {
+    transition: all 0.2s ease;
+}
+
+/* Optimize rendering */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* GPU acceleration for animations */
+.gpu {
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

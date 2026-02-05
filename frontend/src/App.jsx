@@ -1,23 +1,51 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import { useAuth } from './hooks/useAuth'
 
-// Public pages
-import Feedback from './pages/Feedback'
-import ThankYou from './pages/ThankYou'
+// Loading spinner component
+function LoadingSpinner() {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-black">
+            <div className="relative">
+                {/* Outer ring */}
+                <div 
+                    className="w-16 h-16 rounded-full animate-spin"
+                    style={{
+                        border: '3px solid rgba(102, 126, 234, 0.2)',
+                        borderTopColor: '#667eea',
+                    }}
+                />
+                {/* Inner pulse */}
+                <div 
+                    className="absolute inset-0 flex items-center justify-center"
+                >
+                    <div 
+                        className="w-8 h-8 rounded-full animate-pulse"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                        }}
+                    />
+                </div>
+            </div>
+        </div>
+    )
+}
 
-// Auth pages
+// Lazy load heavy pages
+const Welcome = lazy(() => import('./pages/Welcome'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const QRCode = lazy(() => import('./pages/QRCode'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Pricing = lazy(() => import('./pages/Pricing'))
+const Feedback = lazy(() => import('./pages/Feedback'))
+
+// Regular imports for lighter pages
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-
-// Dashboard pages
-import Dashboard from './pages/Dashboard'
-import QRCode from './pages/QRCode'
-import Settings from './pages/Settings'
-import Pricing from './pages/Pricing'
-import Welcome from './pages/Welcome'
+import ThankYou from './pages/ThankYou'
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -129,7 +157,9 @@ function App() {
     return (
         <Router>
             <AuthProvider>
-                <AppRoutes />
+                <Suspense fallback={<LoadingSpinner />}>
+                    <AppRoutes />
+                </Suspense>
             </AuthProvider>
         </Router>
     )
