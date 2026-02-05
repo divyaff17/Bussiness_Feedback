@@ -20,9 +20,10 @@ import { apiLimiter } from './middleware/rateLimit.js';
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// CORS configuration
+// CORS configuration - strip any path from FRONTEND_URL
+const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8000').replace(/\/+$/, '').split('/').slice(0, 3).join('/');
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8000',
+    origin: frontendUrl,
     credentials: true
 }));
 
