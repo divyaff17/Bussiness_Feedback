@@ -34,8 +34,23 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    owner_name TEXT,
+    profile_picture_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ============================================
+-- ADD COLUMNS IF THEY DON'T EXIST (for existing databases)
+-- ============================================
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'owner_name') THEN
+        ALTER TABLE users ADD COLUMN owner_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'profile_picture_url') THEN
+        ALTER TABLE users ADD COLUMN profile_picture_url TEXT;
+    END IF;
+END $$;
 
 -- ============================================
 -- TABLE 3: FEEDBACKS
@@ -58,6 +73,22 @@ CREATE INDEX IF NOT EXISTS idx_feedbacks_business_id ON feedbacks(business_id);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_created_at ON feedbacks(created_at);
 CREATE INDEX IF NOT EXISTS idx_feedbacks_is_positive ON feedbacks(is_positive);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- ============================================
+-- TABLE 4: PASSWORD RESET TOKENS
+-- Stores password reset tokens for users
+-- ============================================
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 
 -- ============================================
 -- ROW LEVEL SECURITY (RLS)

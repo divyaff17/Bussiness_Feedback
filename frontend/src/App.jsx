@@ -9,12 +9,15 @@ import ThankYou from './pages/ThankYou'
 // Auth pages
 import Login from './pages/Login'
 import Signup from './pages/Signup'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 // Dashboard pages
 import Dashboard from './pages/Dashboard'
 import QRCode from './pages/QRCode'
 import Settings from './pages/Settings'
 import Pricing from './pages/Pricing'
+import Welcome from './pages/Welcome'
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -72,8 +75,23 @@ function AppRoutes() {
                     <Signup />
                 </PublicRoute>
             } />
+            <Route path="/forgot-password" element={
+                <PublicRoute>
+                    <ForgotPassword />
+                </PublicRoute>
+            } />
+            <Route path="/reset-password" element={
+                <PublicRoute>
+                    <ResetPassword />
+                </PublicRoute>
+            } />
 
             {/* Protected Dashboard Routes */}
+            <Route path="/welcome" element={
+                <ProtectedRoute>
+                    <Welcome />
+                </ProtectedRoute>
+            } />
             <Route path="/dashboard" element={
                 <ProtectedRoute>
                     <Dashboard />

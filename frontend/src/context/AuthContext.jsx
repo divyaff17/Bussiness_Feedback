@@ -97,6 +97,10 @@ export function AuthProvider({ children }) {
 
     const getApiUrl = () => API_URL
 
+    const updateUser = (updates) => {
+        setUser(prev => prev ? { ...prev, ...updates } : null)
+    }
+
     const value = {
         user,
         loading,
@@ -104,7 +108,8 @@ export function AuthProvider({ children }) {
         signup,
         logout,
         getToken,
-        getApiUrl
+        getApiUrl,
+        updateUser
     }
 
     return (

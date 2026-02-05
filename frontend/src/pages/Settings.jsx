@@ -1,20 +1,44 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
+import ElectricBorder from '../components/ElectricBorder'
 import API_URL from '../config/api'
 
+// Glass card style helper
+const glassCard = {
+    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+    borderRadius: '1.5rem',
+}
+
+// Glass input style helper
+const glassInput = {
+    background: 'rgba(255, 255, 255, 0.08)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    backdropFilter: 'blur(10px)',
+    color: 'white',
+    borderRadius: '0.75rem',
+}
+
 export default function Settings() {
-    const { user, getToken } = useAuth()
+    const { user, getToken, updateUser } = useAuth()
     const [formData, setFormData] = useState({
         name: '',
         category: '',
         googleReviewUrl: '',
         logoUrl: ''
     })
+    const [profileImage, setProfileImage] = useState(null)
+    const [profileImagePreview, setProfileImagePreview] = useState(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [uploadingAvatar, setUploadingAvatar] = useState(false)
     const [success, setSuccess] = useState(false)
     const [error, setError] = useState('')
+    const fileInputRef = useRef(null)
 
     const BUSINESS_CATEGORIES = [
         'Restaurant',
@@ -55,6 +79,67 @@ export default function Settings() {
         setError('')
     }
 
+    const handleImageChange = (e) => {
+        const file = e.target.files[0]
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                setError('Image size must be less than 5MB')
+                return
+            }
+
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setProfileImage(reader.result)
+                setProfileImagePreview(reader.result)
+            }
+            reader.readAsDataURL(file)
+        }
+    }
+
+    const handleAvatarUpload = async () => {
+        if (!profileImage) return
+
+        setUploadingAvatar(true)
+        setError('')
+        setSuccess(false)
+
+        try {
+            const token = getToken()
+            const response = await fetch(`${API_URL}/api/upload/avatar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    imageData: profileImage
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to upload avatar')
+            }
+
+            // Update user context with new profile picture URL
+            updateUser({ profilePictureUrl: data.url })
+            setProfileImage(null)
+            setProfileImagePreview(null)
+            setSuccess(true)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setUploadingAvatar(false)
+        }
+    }
+
+    // Generate default avatar with initials
+    const getDefaultAvatar = (name) => {
+        const initial = (name || 'U').charAt(0).toUpperCase()
+        return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#667eea" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setSaving(true)
@@ -90,20 +175,143 @@ export default function Settings() {
         <Layout>
             <div className="max-w-2xl mx-auto animate-fadeIn">
                 <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-                    <p className="text-gray-500">Manage your business information</p>
+                    <h1 
+                        className="text-2xl font-bold"
+                        style={{
+                            background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                        }}
+                    >
+                        ⚙️ Settings
+                    </h1>
+                    <p className="text-white/60">Manage your business information</p>
                 </div>
 
                 {loading ? (
                     <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent"></div>
+                        <div 
+                            className="animate-spin rounded-full h-10 w-10 border-4 border-t-transparent"
+                            style={{ borderColor: '#667eea', borderTopColor: 'transparent' }}
+                        ></div>
                     </div>
                 ) : (
-                    <div className="card">
+                    <ElectricBorder color="#14b8a6" speed={1} chaos={0.12} borderRadius={24}>
+                    <div className="p-6" style={glassCard}>
+                        {/* Profile Picture Section */}
+                        <div 
+                            className="mb-8 pb-6"
+                            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
+                        >
+                            <h3 
+                                className="font-semibold mb-4"
+                                style={{
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >
+                                Profile Picture
+                            </h3>
+                            <div className="flex items-center gap-6">
+                                <div
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-24 h-24 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 overflow-hidden"
+                                    style={{
+                                        border: '2px dashed rgba(102, 126, 234, 0.5)',
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.8)';
+                                        e.currentTarget.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.3)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.5)';
+                                        e.currentTarget.style.boxShadow = 'none';
+                                    }}
+                                >
+                                    {profileImagePreview ? (
+                                        <img
+                                            src={profileImagePreview}
+                                            alt="New profile preview"
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <img
+                                            src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
+                                            alt="Current profile"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="hidden"
+                                    disabled={uploadingAvatar}
+                                />
+                                <div className="flex-1">
+                                    <p className="text-sm text-white/60 mb-2">
+                                        Click on the image to change your profile picture
+                                    </p>
+                                    {profileImage && (
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleAvatarUpload}
+                                                disabled={uploadingAvatar}
+                                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+                                                style={{
+                                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                                    color: 'white',
+                                                }}
+                                            >
+                                                {uploadingAvatar ? (
+                                                    <span className="flex items-center">
+                                                        <span 
+                                                            className="animate-spin rounded-full h-4 w-4 border-2 border-t-transparent mr-2"
+                                                            style={{ borderColor: 'white', borderTopColor: 'transparent' }}
+                                                        ></span>
+                                                        Uploading...
+                                                    </span>
+                                                ) : (
+                                                    'Save Photo'
+                                                )}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setProfileImage(null)
+                                                    setProfileImagePreview(null)
+                                                }}
+                                                disabled={uploadingAvatar}
+                                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+                                                style={{
+                                                    background: 'rgba(255, 255, 255, 0.1)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                                    color: 'white',
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
                         <form onSubmit={handleSubmit}>
                             {/* Business Name */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-white/80 mb-2">
                                     Business Name
                                 </label>
                                 <input
@@ -111,35 +319,49 @@ export default function Settings() {
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
-                                    className="input"
+                                    className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none placeholder-white/40"
+                                    style={{
+                                        ...glassInput,
+                                    }}
                                     placeholder="Your Business Name"
                                     required
                                     disabled={saving}
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = 'rgba(102, 126, 234, 0.5)';
+                                        e.target.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.2)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                        e.target.style.boxShadow = 'none';
+                                    }}
                                 />
                             </div>
 
                             {/* Category */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-white/80 mb-2">
                                     Business Category
                                 </label>
                                 <select
                                     name="category"
                                     value={formData.category}
                                     onChange={handleChange}
-                                    className="input"
+                                    className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none"
+                                    style={{
+                                        ...glassInput,
+                                    }}
                                     required
                                     disabled={saving}
                                 >
                                     {BUSINESS_CATEGORIES.map((cat) => (
-                                        <option key={cat} value={cat}>{cat}</option>
+                                        <option key={cat} value={cat} style={{ background: '#1a1a2e', color: 'white' }}>{cat}</option>
                                     ))}
                                 </select>
                             </div>
 
                             {/* Google Review URL */}
                             <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-white/80 mb-2">
                                     Google Review URL
                                 </label>
                                 <input
@@ -147,19 +369,22 @@ export default function Settings() {
                                     name="googleReviewUrl"
                                     value={formData.googleReviewUrl}
                                     onChange={handleChange}
-                                    className="input"
+                                    className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none placeholder-white/40"
+                                    style={{
+                                        ...glassInput,
+                                    }}
                                     placeholder="https://g.page/r/..."
                                     required
                                     disabled={saving}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-white/40 mt-1">
                                     This is where happy customers will be redirected
                                 </p>
                             </div>
 
                             {/* Logo URL */}
                             <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-white/80 mb-2">
                                     Logo URL (optional)
                                 </label>
                                 <input
@@ -167,36 +392,62 @@ export default function Settings() {
                                     name="logoUrl"
                                     value={formData.logoUrl}
                                     onChange={handleChange}
-                                    className="input"
+                                    className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none placeholder-white/40"
+                                    style={{
+                                        ...glassInput,
+                                    }}
                                     placeholder="https://example.com/logo.png"
                                     disabled={saving}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-white/40 mt-1">
                                     Direct link to your business logo image
                                 </p>
                             </div>
 
                             {/* Logo Preview */}
                             {formData.logoUrl && (
-                                <div className="mb-6 p-4 bg-gray-50 rounded-xl">
-                                    <p className="text-sm text-gray-500 mb-2">Logo Preview:</p>
+                                <div 
+                                    className="mb-6 p-4 rounded-xl"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.05)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                >
+                                    <p className="text-sm text-white/50 mb-2">Logo Preview:</p>
                                     <img
                                         src={formData.logoUrl}
                                         alt="Logo preview"
                                         className="w-20 h-20 rounded-full object-cover"
+                                        style={{
+                                            border: '2px solid rgba(102, 126, 234, 0.5)',
+                                        }}
                                         onError={(e) => e.target.style.display = 'none'}
                                     />
                                 </div>
                             )}
 
                             {error && (
-                                <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-xl text-sm">
+                                <div 
+                                    className="mb-4 p-3 rounded-xl text-sm"
+                                    style={{
+                                        background: 'rgba(239, 68, 68, 0.15)',
+                                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                                        color: '#f87171',
+                                    }}
+                                >
                                     {error}
                                 </div>
                             )}
 
                             {success && (
-                                <div className="mb-4 p-3 bg-green-50 text-green-600 rounded-xl text-sm">
+                                <div 
+                                    className="mb-4 p-3 rounded-xl text-sm"
+                                    style={{
+                                        background: 'rgba(34, 197, 94, 0.15)',
+                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        color: '#4ade80',
+                                    }}
+                                >
                                     ✓ Settings saved successfully!
                                 </div>
                             )}
@@ -204,11 +455,22 @@ export default function Settings() {
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className={`w-full btn-primary ${saving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className="w-full py-3 px-6 rounded-xl font-semibold transition-all duration-300"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                    color: 'white',
+                                    boxShadow: '0 0 20px rgba(102, 126, 234, 0.3)',
+                                    opacity: saving ? 0.5 : 1,
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                }}
                             >
                                 {saving ? (
                                     <span className="flex items-center justify-center">
-                                        <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></span>
+                                        <span 
+                                            className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent mr-2"
+                                            style={{ borderColor: 'white', borderTopColor: 'transparent' }}
+                                        ></span>
                                         Saving...
                                     </span>
                                 ) : (
@@ -218,22 +480,48 @@ export default function Settings() {
                         </form>
 
                         {/* Account Info */}
-                        <div className="mt-8 pt-6 border-t border-gray-200">
-                            <h3 className="font-semibold text-gray-800 mb-4">Account Information</h3>
+                        <div 
+                            className="mt-8 pt-6"
+                            style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}
+                        >
+                            <h3 
+                                className="font-semibold mb-4"
+                                style={{
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >
+                                Account Information
+                            </h3>
                             <div className="space-y-2 text-sm">
+                                {user?.ownerName && (
+                                    <p className="flex justify-between">
+                                        <span className="text-white/50">Owner Name:</span>
+                                        <span className="text-white/90">{user.ownerName}</span>
+                                    </p>
+                                )}
                                 <p className="flex justify-between">
-                                    <span className="text-gray-500">Email:</span>
-                                    <span className="text-gray-800">{user?.email}</span>
+                                    <span className="text-white/50">Email:</span>
+                                    <span className="text-white/90">{user?.email}</span>
                                 </p>
                                 <p className="flex justify-between">
-                                    <span className="text-gray-500">Business ID:</span>
-                                    <code className="text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                                    <span className="text-white/50">Business ID:</span>
+                                    <code 
+                                        className="px-2 py-0.5 rounded"
+                                        style={{
+                                            background: 'rgba(102, 126, 234, 0.2)',
+                                            color: '#a5b4fc',
+                                        }}
+                                    >
                                         {user?.businessId}
                                     </code>
                                 </p>
                             </div>
                         </div>
                     </div>
+                    </ElectricBorder>
                 )}
             </div>
         </Layout>

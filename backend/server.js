@@ -12,6 +12,7 @@ import './db/supabase.js';
 import authRoutes from './routes/auth.js';
 import businessRoutes from './routes/business.js';
 import feedbackRoutes from './routes/feedback.js';
+import uploadRoutes from './routes/upload.js';
 
 // Import middleware
 import { apiLimiter } from './middleware/rateLimit.js';
@@ -25,8 +26,8 @@ app.use(cors({
     credentials: true
 }));
 
-// Parse JSON bodies
-app.use(express.json());
+// Parse JSON bodies (increased limit for image uploads)
+app.use(express.json({ limit: '10mb' }));
 
 // Apply general rate limiting to all API routes
 app.use('/api', apiLimiter);
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

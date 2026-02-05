@@ -1,13 +1,114 @@
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import Plasma from './Plasma'
+
+// Inject layout animations
+const LAYOUT_KEYFRAMES_ID = 'layout-keyframes';
+if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES_ID)) {
+    const style = document.createElement('style');
+    style.id = LAYOUT_KEYFRAMES_ID;
+    style.textContent = `
+        @keyframes fadeInUp {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes glassShine {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        @keyframes borderGlow {
+            0%, 100% { border-color: rgba(255, 255, 255, 0.1); }
+            50% { border-color: rgba(255, 255, 255, 0.25); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.5); }
+        }
+        @keyframes dropdownFadeIn {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes logoGlow {
+            0%, 100% { 
+                filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.5));
+                transform: scale(1);
+            }
+            50% { 
+                filter: drop-shadow(0 0 20px rgba(118, 75, 162, 0.7));
+                transform: scale(1.02);
+            }
+        }
+        @keyframes logoShimmer {
+            0% { background-position: 200% center; }
+            100% { background-position: -200% center; }
+        }
+        @keyframes navItemFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+        @keyframes iconBounce {
+            0%, 100% { transform: scale(1) rotate(0deg); }
+            25% { transform: scale(1.2) rotate(-5deg); }
+            75% { transform: scale(1.1) rotate(5deg); }
+        }
+        @keyframes activeGlow {
+            0%, 100% { box-shadow: 0 0 15px rgba(102, 126, 234, 0.4), inset 0 0 10px rgba(102, 126, 234, 0.1); }
+            50% { box-shadow: 0 0 25px rgba(118, 75, 162, 0.6), inset 0 0 15px rgba(118, 75, 162, 0.2); }
+        }
+        @keyframes navbarShine {
+            0% { left: -100%; }
+            50%, 100% { left: 100%; }
+        }
+        @keyframes profileRing {
+            0%, 100% { 
+                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+            }
+            50% { 
+                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0);
+            }
+        }
+        @keyframes slideInNav {
+            0% { opacity: 0; transform: translateX(-20px); }
+            100% { opacity: 1; transform: translateX(0); }
+        }
+        .nav-item-hover:hover .nav-icon {
+            animation: iconBounce 0.5s ease-in-out;
+        }
+        .nav-item-hover:hover {
+            animation: navItemFloat 0.5s ease-in-out;
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 export default function Layout({ children }) {
     const { user, logout } = useAuth()
     const navigate = useNavigate()
+    const [showProfileDropdown, setShowProfileDropdown] = useState(false)
+    const profileDropdownRef = useRef(null)
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+                setShowProfileDropdown(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
 
     const handleLogout = () => {
         logout()
         navigate('/login')
+    }
+
+    // Generate default avatar with initials
+    const getDefaultAvatar = (name) => {
+        const initial = (name || 'U').charAt(0).toUpperCase()
+        return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#667eea" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
     }
 
     const navItems = [
@@ -18,54 +119,207 @@ export default function Layout({ children }) {
     ]
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Top Navigation */}
-            <nav className="bg-white shadow-soft sticky top-0 z-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex justify-between h-16">
+        <div className="min-h-screen bg-black relative overflow-hidden">
+            {/* Plasma Background */}
+            <div className="fixed inset-0 z-0">
+                <Plasma 
+                    color="#667eea"
+                    speed={0.6}
+                    direction="forward"
+                    scale={1.1}
+                    opacity={0.4}
+                    mouseInteractive={true}
+                />
+            </div>
+            
+            {/* Top Navigation - Glass Effect */}
+            <nav 
+                className="fixed top-0 left-0 right-0 z-50"
+                style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3)',
+                    overflow: 'visible',
+                }}
+            >
+                {/* Animated shine effect across navbar */}
+                <div 
+                    className="absolute top-0 h-full w-1/3 pointer-events-none"
+                    style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent)',
+                        animation: 'navbarShine 4s ease-in-out infinite',
+                        zIndex: 0,
+                    }}
+                />
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative" style={{ overflow: 'visible', zIndex: 10 }}>
+                    <div className="flex justify-between h-16" style={{ overflow: 'visible' }}>
                         {/* Logo */}
-                        <div className="flex items-center">
-                            <span className="text-2xl font-bold gradient-text">
+                        <div className="flex items-center" style={{ position: 'relative', zIndex: 20 }}>
+                            <span 
+                                className="text-2xl font-bold cursor-pointer relative"
+                                style={{
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #a5b4fc 50%, #764ba2 75%, #667eea 100%)',
+                                    backgroundSize: '200% auto',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                    animation: 'logoShimmer 3s linear infinite, logoGlow 2s ease-in-out infinite',
+                                }}
+                            >
                                 FeedbackPro
                             </span>
                         </div>
 
                         {/* Desktop Navigation */}
-                        <div className="hidden md:flex items-center space-x-4">
-                            {navItems.map((item) => (
+                        <div className="hidden md:flex items-center space-x-2" style={{ overflow: 'visible', position: 'relative', zIndex: 20 }}>
+                            {navItems.map((item, index) => (
                                 <NavLink
                                     key={item.path}
                                     to={item.path}
                                     className={({ isActive }) =>
-                                        `px-4 py-2 rounded-lg font-medium transition-all duration-200 ${isActive
-                                            ? 'bg-blue-50 text-blue-600'
-                                            : 'text-gray-600 hover:bg-gray-50'
+                                        `nav-item-hover px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center ${isActive
+                                            ? ''
+                                            : 'hover:bg-white/10'
                                         }`
                                     }
+                                    style={({ isActive }) => ({
+                                        ...(isActive ? {
+                                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                                            border: '1px solid rgba(102, 126, 234, 0.4)',
+                                            color: '#a5b4fc',
+                                            animation: 'activeGlow 2s ease-in-out infinite',
+                                        } : {
+                                            color: 'rgba(255, 255, 255, 0.7)',
+                                            border: '1px solid transparent',
+                                        }),
+                                        animationDelay: `${index * 0.1}s`,
+                                    })}
                                 >
-                                    <span className="mr-2">{item.icon}</span>
-                                    {item.label}
+                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1 }}>{item.icon}</span>
+                                    <span>{item.label}</span>
                                 </NavLink>
                             ))}
 
-                            <div className="h-6 w-px bg-gray-200 mx-2"></div>
+                            <div className="h-6 w-px bg-white/20 mx-2"></div>
 
-                            <span className="text-sm text-gray-500">
-                                {user?.businessName}
-                            </span>
+                            {/* User Profile Section with Dropdown */}
+                            <div className="relative" ref={profileDropdownRef} style={{ zIndex: 100 }}>
+                                <button
+                                    onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                                    className="flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-300 group"
+                                    style={{
+                                        background: showProfileDropdown ? 'rgba(102, 126, 234, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                        border: showProfileDropdown ? '1px solid rgba(102, 126, 234, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                        animation: showProfileDropdown ? 'activeGlow 2s ease-in-out infinite' : 'none',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!showProfileDropdown) {
+                                            e.currentTarget.style.background = 'rgba(102, 126, 234, 0.15)'
+                                            e.currentTarget.style.border = '1px solid rgba(102, 126, 234, 0.3)'
+                                            e.currentTarget.style.transform = 'translateY(-1px)'
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!showProfileDropdown) {
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                                            e.currentTarget.style.border = '1px solid rgba(255, 255, 255, 0.1)'
+                                            e.currentTarget.style.transform = 'translateY(0)'
+                                        }
+                                    }}
+                                >
+                                    <img
+                                        src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
+                                        alt="Profile"
+                                        className="w-8 h-8 rounded-full object-cover"
+                                        style={{
+                                            border: '2px solid rgba(102, 126, 234, 0.5)',
+                                            boxShadow: '0 0 10px rgba(102, 126, 234, 0.3)',
+                                            animation: 'profileRing 2s ease-in-out infinite',
+                                        }}
+                                        onError={(e) => {
+                                            e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
+                                        }}
+                                    />
+                                    <span className="text-sm text-white/80 font-medium group-hover:text-white transition-colors duration-300">
+                                        {user?.ownerName || user?.businessName}
+                                    </span>
+                                    <svg 
+                                        className={`w-4 h-4 text-white/60 transition-all duration-300 group-hover:text-white/80 ${showProfileDropdown ? 'rotate-180' : ''}`} 
+                                        fill="none" 
+                                        viewBox="0 0 24 24" 
+                                        stroke="currentColor"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
 
-                            <button
-                                onClick={handleLogout}
-                                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-all duration-200"
-                            >
-                                Logout
-                            </button>
+                                {/* Profile Dropdown */}
+                                {showProfileDropdown && (
+                                    <div 
+                                        className="absolute right-0 mt-2 w-56 rounded-xl"
+                                        style={{
+                                            zIndex: 9999,
+                                            background: 'linear-gradient(135deg, rgba(30, 30, 50, 0.98) 0%, rgba(20, 20, 40, 0.98) 100%)',
+                                            backdropFilter: 'blur(20px)',
+                                            WebkitBackdropFilter: 'blur(20px)',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                            animation: 'dropdownFadeIn 0.2s ease-out',
+                                        }}
+                                    >
+                                        {/* Profile Info */}
+                                        <div 
+                                            className="px-4 py-3"
+                                            style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}
+                                        >
+                                            <p className="text-white font-medium truncate">{user?.ownerName || user?.businessName}</p>
+                                            <p className="text-white/50 text-sm truncate">{user?.email}</p>
+                                        </div>
+
+                                        {/* Dropdown Items */}
+                                        <div className="py-2">
+                                            <button
+                                                onClick={() => {
+                                                    setShowProfileDropdown(false)
+                                                    handleLogout()
+                                                }}
+                                                className="w-full px-4 py-2.5 text-left flex items-center gap-3 transition-all duration-300 group"
+                                                style={{ color: '#f87171' }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = 'rgba(248, 113, 113, 0.1)'
+                                                    e.currentTarget.style.paddingLeft = '20px'
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = 'transparent'
+                                                    e.currentTarget.style.paddingLeft = '16px'
+                                                }}
+                                            >
+                                                <span className="transition-transform duration-300 group-hover:scale-110">🚪</span>
+                                                <span>Logout</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {/* Mobile menu button */}
                         <div className="md:hidden flex items-center">
                             <button
-                                className="text-gray-600 hover:text-gray-900"
+                                className="text-white/80 hover:text-white p-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
+                                    e.currentTarget.style.boxShadow = '0 0 15px rgba(102, 126, 234, 0.3)'
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                                    e.currentTarget.style.boxShadow = 'none'
+                                }}
                                 onClick={() => document.getElementById('mobile-menu').classList.toggle('hidden')}
                             >
                                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -77,18 +331,54 @@ export default function Layout({ children }) {
                 </div>
 
                 {/* Mobile Navigation */}
-                <div id="mobile-menu" className="hidden md:hidden border-t border-gray-200">
+                <div 
+                    id="mobile-menu" 
+                    className="hidden md:hidden"
+                    style={{
+                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(20px)',
+                    }}
+                >
                     <div className="px-4 py-3 space-y-2">
+                        {/* Mobile Profile Section */}
+                        <div 
+                            className="flex items-center gap-3 px-4 py-3 rounded-xl mb-3"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                            }}
+                        >
+                            <img
+                                src={user?.profilePictureUrl || getDefaultAvatar(user?.ownerName || user?.businessName)}
+                                alt="Profile"
+                                className="w-10 h-10 rounded-full object-cover"
+                                style={{
+                                    border: '2px solid rgba(102, 126, 234, 0.5)',
+                                }}
+                                onError={(e) => {
+                                    e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
+                                }}
+                            />
+                            <div>
+                                <p className="text-white font-medium">{user?.ownerName || user?.businessName}</p>
+                                <p className="text-white/50 text-sm">{user?.email}</p>
+                            </div>
+                        </div>
+
                         {navItems.map((item) => (
                             <NavLink
                                 key={item.path}
                                 to={item.path}
-                                className={({ isActive }) =>
-                                    `block px-4 py-2 rounded-lg font-medium ${isActive
-                                        ? 'bg-blue-50 text-blue-600'
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                    }`
-                                }
+                                className="block px-4 py-3 rounded-xl font-medium transition-all"
+                                style={({ isActive }) => isActive ? {
+                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+                                    border: '1px solid rgba(102, 126, 234, 0.4)',
+                                    color: '#a5b4fc',
+                                } : {
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                }}
                             >
                                 <span className="mr-2">{item.icon}</span>
                                 {item.label}
@@ -96,17 +386,24 @@ export default function Layout({ children }) {
                         ))}
                         <button
                             onClick={handleLogout}
-                            className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                            className="w-full text-left px-4 py-3 rounded-xl font-medium mt-2"
+                            style={{
+                                color: '#f87171',
+                                background: 'rgba(248, 113, 113, 0.1)',
+                                border: '1px solid rgba(248, 113, 113, 0.2)',
+                            }}
                         >
-                            Logout
+                            🚪 Logout
                         </button>
                     </div>
                 </div>
             </nav>
 
             {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {children}
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+                <div style={{ animation: 'fadeInUp 0.6s ease-out' }}>
+                    {children}
+                </div>
             </main>
         </div>
     )

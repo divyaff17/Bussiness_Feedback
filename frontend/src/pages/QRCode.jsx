@@ -1,8 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
+import ElectricBorder from '../components/ElectricBorder'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
+
+// Glass card style helper
+const glassCard = {
+    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255, 255, 255, 0.15)',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+    borderRadius: '1.5rem',
+}
 
 export default function QRCode() {
     const { user, getToken, logout } = useAuth()
@@ -92,10 +103,15 @@ export default function QRCode() {
         return (
             <Layout>
                 <div className="max-w-2xl mx-auto animate-fadeIn">
-                    <div className="card text-center py-16">
-                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto"></div>
-                        <p className="mt-4 text-gray-600">Generating your QR code...</p>
+                    <ElectricBorder color="#8b5cf6" speed={0.8} chaos={0.1} borderRadius={24}>
+                    <div className="p-6 text-center py-16" style={glassCard}>
+                        <div 
+                            className="animate-spin rounded-full h-12 w-12 border-4 border-t-transparent mx-auto"
+                            style={{ borderColor: '#667eea', borderTopColor: 'transparent' }}
+                        ></div>
+                        <p className="mt-4 text-white/60">Generating your QR code...</p>
                     </div>
+                    </ElectricBorder>
                 </div>
             </Layout>
         )
@@ -106,25 +122,47 @@ export default function QRCode() {
         return (
             <Layout>
                 <div className="max-w-2xl mx-auto animate-fadeIn">
-                    <div className="card text-center py-12">
+                    <ElectricBorder color="#ef4444" speed={1} chaos={0.15} borderRadius={24}>
+                    <div className="p-6 text-center py-12" style={glassCard}>
                         <div className="text-6xl mb-4">⚠️</div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
-                        <p className="text-gray-600 mb-6">{error}</p>
+                        <h2 
+                            className="text-xl font-bold mb-2"
+                            style={{
+                                background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                            }}
+                        >
+                            Something went wrong
+                        </h2>
+                        <p className="text-white/60 mb-6">{error}</p>
                         <div className="space-x-4">
                             <button
                                 onClick={fetchQRCode}
-                                className="btn-secondary"
+                                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    color: 'white',
+                                }}
                             >
                                 🔄 Try Again
                             </button>
                             <button
                                 onClick={handleLogoutAndSignup}
-                                className="btn-primary"
+                                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                    color: '#a5b4fc',
+                                }}
                             >
                                 📝 Sign Up Again
                             </button>
                         </div>
                     </div>
+                    </ElectricBorder>
                 </div>
             </Layout>
         )
@@ -136,48 +174,98 @@ export default function QRCode() {
             <div className="max-w-2xl mx-auto animate-fadeIn">
                 {/* Header */}
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800">Your QR Code</h1>
-                    <p className="text-gray-500 mt-2">
+                    <h1 
+                        className="text-3xl font-bold"
+                        style={{
+                            background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                        }}
+                    >
+                        📱 Your QR Code
+                    </h1>
+                    <p className="text-white/60 mt-2">
                         Print this QR code and place it where customers can scan
                     </p>
                 </div>
 
                 {qrData ? (
-                    <div className="card">
+                    <ElectricBorder color="#3b82f6" speed={1} chaos={0.12} borderRadius={24}>
+                    <div className="p-6" style={glassCard}>
                         {/* Business Info */}
                         <div className="text-center mb-6">
-                            <h2 className="text-xl font-bold text-gray-800">
+                            <h2 
+                                className="text-xl font-bold"
+                                style={{
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >
                                 {qrData.businessName}
                             </h2>
                         </div>
 
                         {/* QR Code Image */}
-                        <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-8 rounded-2xl text-center mb-6">
-                            <div className="bg-white p-6 rounded-xl inline-block shadow-lg">
+                        <div 
+                            className="p-8 rounded-2xl text-center mb-6"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                            }}
+                        >
+                            <div 
+                                className="p-6 rounded-xl inline-block"
+                                style={{
+                                    background: 'white',
+                                    boxShadow: '0 0 40px rgba(102, 126, 234, 0.4)',
+                                }}
+                            >
                                 <img
                                     src={qrData.qrCode}
                                     alt="Feedback QR Code"
                                     className="w-64 h-64 mx-auto"
                                 />
                             </div>
-                            <p className="mt-4 text-gray-600 font-medium">
+                            <p className="mt-4 text-white/70 font-medium">
                                 📱 Scan to give feedback
                             </p>
                         </div>
 
                         {/* Feedback URL */}
-                        <div className="bg-gray-50 p-4 rounded-xl mb-6">
-                            <p className="text-sm text-gray-500 mb-2 text-center">🔗 Feedback Link</p>
+                        <div 
+                            className="p-4 rounded-xl mb-6"
+                            style={{
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                            }}
+                        >
+                            <p className="text-sm text-white/50 mb-2 text-center">🔗 Feedback Link</p>
                             <div className="flex items-center justify-center gap-2 flex-wrap">
-                                <code className="px-3 py-2 bg-white rounded-lg text-sm font-mono text-blue-600 border break-all">
+                                <code 
+                                    className="px-3 py-2 rounded-lg text-sm font-mono break-all"
+                                    style={{
+                                        background: 'rgba(102, 126, 234, 0.2)',
+                                        border: '1px solid rgba(102, 126, 234, 0.3)',
+                                        color: '#a5b4fc',
+                                    }}
+                                >
                                     {qrData.feedbackUrl}
                                 </code>
                                 <button
                                     onClick={copyLink}
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${copied
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-blue-100 hover:bg-blue-200 text-blue-700'
-                                        }`}
+                                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+                                    style={copied ? {
+                                        background: 'rgba(34, 197, 94, 0.3)',
+                                        border: '1px solid rgba(34, 197, 94, 0.5)',
+                                        color: '#4ade80',
+                                    } : {
+                                        background: 'rgba(102, 126, 234, 0.2)',
+                                        border: '1px solid rgba(102, 126, 234, 0.3)',
+                                        color: '#a5b4fc',
+                                    }}
                                 >
                                     {copied ? '✓ Copied!' : '📋 Copy'}
                                 </button>
@@ -188,37 +276,50 @@ export default function QRCode() {
                         <div className="flex justify-center">
                             <button
                                 onClick={downloadQR}
-                                className="btn-primary text-lg px-8 py-4"
+                                className="text-lg px-8 py-4 rounded-xl font-semibold transition-all duration-300"
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                    color: 'white',
+                                    boxShadow: '0 0 30px rgba(102, 126, 234, 0.3)',
+                                }}
                             >
                                 📥 Download QR Code
                             </button>
                         </div>
-
-                        {/* Tips */}
-                        <div className="mt-8 p-4 bg-green-50 rounded-xl">
-                            <h3 className="font-semibold text-green-800 mb-3">💡 Tips for best results</h3>
-                            <ul className="text-sm text-green-700 space-y-2">
-                                <li>✓ Print on a size that's easy to scan (at least 3x3 inches)</li>
-                                <li>✓ Place near checkout counter or exit</li>
-                                <li>✓ Add text like "Share your feedback" above the QR</li>
-                                <li>✓ Consider laminating for durability</li>
-                            </ul>
-                        </div>
                     </div>
+                    </ElectricBorder>
                 ) : (
-                    <div className="card text-center py-12">
+                    <ElectricBorder color="#06b6d4" speed={0.9} chaos={0.1} borderRadius={24}>
+                    <div className="p-6 text-center py-12" style={glassCard}>
                         <div className="text-6xl mb-4">📱</div>
-                        <h2 className="text-xl font-bold text-gray-800 mb-2">No QR Code Available</h2>
-                        <p className="text-gray-600 mb-6">
+                        <h2 
+                            className="text-xl font-bold mb-2"
+                            style={{
+                                background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                backgroundClip: 'text',
+                            }}
+                        >
+                            No QR Code Available
+                        </h2>
+                        <p className="text-white/60 mb-6">
                             Please sign up to create your business QR code.
                         </p>
                         <button
                             onClick={handleLogoutAndSignup}
-                            className="btn-primary"
+                            className="px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+                            style={{
+                                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                border: '1px solid rgba(102, 126, 234, 0.5)',
+                                color: '#a5b4fc',
+                            }}
                         >
                             📝 Sign Up Now
                         </button>
                     </div>
+                    </ElectricBorder>
                 )}
             </div>
         </Layout>
