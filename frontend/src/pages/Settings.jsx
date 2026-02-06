@@ -23,14 +23,37 @@ const glassInput = {
     borderRadius: '0.75rem',
 }
 
+// Platform icons
+const platformIcons = {
+    google: '🔍',
+    yelp: '⭐',
+    tripadvisor: '🦉',
+    facebook: '📘',
+    trustpilot: '⭐',
+    googleforms: '📋',
+    surveymonkey: '🐵',
+    typeform: '📝',
+    zomato: '🍽️',
+    swiggy: '🍔',
+    amazon: '📦',
+    booking: '🏨',
+    airbnb: '🏠',
+    custom: '🔗'
+}
+
 export default function Settings() {
     const { user, getToken, updateUser } = useAuth()
     const [formData, setFormData] = useState({
         name: '',
         category: '',
-        googleReviewUrl: '',
         logoUrl: ''
     })
+    // Review platforms state
+    const [reviewPlatforms, setReviewPlatforms] = useState([])
+    const [newPlatform, setNewPlatform] = useState({ url: '', valid: null, validating: false, message: '', platform: '', label: '' })
+    const [savingPlatforms, setSavingPlatforms] = useState(false)
+    const [platformSuccess, setPlatformSuccess] = useState('')
+    
     const [profileImage, setProfileImage] = useState(null)
     const [profileImagePreview, setProfileImagePreview] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -53,23 +76,166 @@ export default function Settings() {
     ]
 
     useEffect(() => {
-        fetchBusinessInfo()
-    }, [])
+        if (user?.businessId) {
+            fetchBusinessInfo()
+            fetchPlatforms()
+        }
+    }, [user?.businessId])
 
     const fetchBusinessInfo = async () => {
+        if (!user?.businessId) return
         try {
             const response = await fetch(`${API_URL}/api/business/${user.businessId}`)
             const data = await response.json()
+            // Map snake_case from backend to camelCase for form
             setFormData({
                 name: data.name || '',
                 category: data.category || '',
-                googleReviewUrl: data.googleReviewUrl || '',
-                logoUrl: data.logoUrl || ''
+                logoUrl: data.logo_url || data.logoUrl || ''
             })
         } catch (error) {
             console.error('Failed to fetch business info:', error)
         } finally {
             setLoading(false)
+        }
+    }
+
+    const fetchPlatforms = async () => {
+        if (!user?.businessId) return
+        try {
+            const token = getToken()
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}/platforms`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (data.platforms) {
+                setReviewPlatforms(data.platforms)
+            }
+        } catch (error) {
+            console.error('Failed to fetch platforms:', error)
+        }
+    }
+
+    // Validate a review platform URL
+    const validatePlatformUrl = async () => {
+        if (!newPlatform.url.trim()) return
+        
+        setNewPlatform(prev => ({ ...prev, validating: true, valid: null, message: '' }))
+        
+        try {
+            const token = getToken()
+            const response = await fetch(`${API_URL}/api/business/validate-review-url`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ url: newPlatform.url })
+            })
+            
+            const data = await response.json()
+            
+            if (response.ok && data.valid) {
+                setNewPlatform(prev => ({
+                    ...prev,
+                    valid: true,
+                    message: `✓ ${data.platform.label} detected`,
+                    platform: data.platform.name,
+                    label: data.platform.label,
+                    validating: false
+                }))
+            } else {
+                setNewPlatform(prev => ({
+                    ...prev,
+                    valid: false,
+                    message: data.error || 'Invalid URL',
+                    validating: false
+                }))
+            }
+        } catch (err) {
+            setNewPlatform(prev => ({
+                ...prev,
+                valid: false,
+                message: 'Validation failed',
+                validating: false
+            }))
+        }
+    }
+
+    // Add a new platform
+    const addPlatform = async () => {
+        if (!newPlatform.valid || !newPlatform.url) return
+        
+        setSavingPlatforms(true)
+        setPlatformSuccess('')
+        
+        try {
+            const token = getToken()
+            const response = await fetch(`${API_URL}/api/business/${user.businessId}/platforms`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    url: newPlatform.url,
+                    platformName: newPlatform.platform,
+                    platformLabel: newPlatform.label,
+                    isPrimary: reviewPlatforms.length === 0
+                })
+            })
+            
+            if (response.ok) {
+                await fetchPlatforms()
+                setNewPlatform({ url: '', valid: null, validating: false, message: '', platform: '', label: '' })
+                setPlatformSuccess('Platform added successfully!')
+                setTimeout(() => setPlatformSuccess(''), 3000)
+            } else {
+                const data = await response.json()
+                setError(data.error || 'Failed to add platform')
+            }
+        } catch (err) {
+            setError('Failed to add platform')
+        } finally {
+            setSavingPlatforms(false)
+        }
+    }
+
+    // Delete a platform
+    const deletePlatform = async (platformId) => {
+        if (!confirm('Remove this review platform?')) return
+        
+        try {
+            const token = getToken()
+            await fetch(`${API_URL}/api/business/${user.businessId}/platforms/${platformId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            await fetchPlatforms()
+            setPlatformSuccess('Platform removed')
+            setTimeout(() => setPlatformSuccess(''), 3000)
+        } catch (err) {
+            setError('Failed to remove platform')
+        }
+    }
+
+    // Set a platform as primary
+    const setPrimaryPlatform = async (platformId) => {
+        try {
+            const token = getToken()
+            await fetch(`${API_URL}/api/business/${user.businessId}/platforms/${platformId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ isPrimary: true })
+            })
+            await fetchPlatforms()
+            setPlatformSuccess('Primary platform updated')
+            setTimeout(() => setPlatformSuccess(''), 3000)
+        } catch (err) {
+            setError('Failed to update platform')
         }
     }
 
@@ -359,27 +525,145 @@ export default function Settings() {
                                 </select>
                             </div>
 
-                            {/* Google Review URL */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-white/80 mb-2">
-                                    Google Review URL
-                                </label>
-                                <input
-                                    type="url"
-                                    name="googleReviewUrl"
-                                    value={formData.googleReviewUrl}
-                                    onChange={handleChange}
-                                    className="w-full px-4 py-3 rounded-xl transition-all duration-300 focus:outline-none placeholder-white/40"
-                                    style={{
-                                        ...glassInput,
-                                    }}
-                                    placeholder="https://g.page/r/..."
-                                    required
-                                    disabled={saving}
-                                />
-                                <p className="text-xs text-white/40 mt-1">
-                                    This is where happy customers will be redirected
+                            {/* Review Platforms Section */}
+                            <div 
+                                className="mb-6 p-4 rounded-xl"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.03)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                }}
+                            >
+                                <h4 className="text-sm font-medium text-white/80 mb-3">
+                                    🔗 Review Platforms
+                                </h4>
+                                <p className="text-xs text-white/40 mb-4">
+                                    Add your review platform links. The primary platform is where happy customers will be redirected.
                                 </p>
+
+                                {/* Existing Platforms */}
+                                {reviewPlatforms.length > 0 && (
+                                    <div className="space-y-3 mb-4">
+                                        {reviewPlatforms.map((platform) => (
+                                            <div 
+                                                key={platform.id}
+                                                className="flex items-center gap-3 p-3 rounded-lg"
+                                                style={{
+                                                    background: platform.is_primary ? 'rgba(102, 126, 234, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                                                    border: platform.is_primary ? '1px solid rgba(102, 126, 234, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                                }}
+                                            >
+                                                <span className="text-xl">
+                                                    {platformIcons[platform.platform_name] || platformIcons.custom}
+                                                </span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-medium text-white/90">
+                                                            {platform.platform_label}
+                                                        </span>
+                                                        {platform.is_primary && (
+                                                            <span 
+                                                                className="text-xs px-2 py-0.5 rounded-full"
+                                                                style={{
+                                                                    background: 'rgba(102, 126, 234, 0.3)',
+                                                                    color: '#a5b4fc'
+                                                                }}
+                                                            >
+                                                                Primary
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-white/40 truncate">
+                                                        {platform.url}
+                                                    </p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {!platform.is_primary && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setPrimaryPlatform(platform.id)}
+                                                            className="text-xs px-2 py-1 rounded-lg transition-all"
+                                                            style={{
+                                                                background: 'rgba(102, 126, 234, 0.2)',
+                                                                color: '#a5b4fc',
+                                                                border: '1px solid rgba(102, 126, 234, 0.3)'
+                                                            }}
+                                                            title="Set as primary"
+                                                        >
+                                                            ⭐
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => deletePlatform(platform.id)}
+                                                        className="text-xs px-2 py-1 rounded-lg transition-all"
+                                                        style={{
+                                                            background: 'rgba(239, 68, 68, 0.15)',
+                                                            color: '#f87171',
+                                                            border: '1px solid rgba(239, 68, 68, 0.3)'
+                                                        }}
+                                                        title="Remove platform"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Add New Platform */}
+                                <div className="flex gap-2">
+                                    <div className="flex-1">
+                                        <input
+                                            type="url"
+                                            value={newPlatform.url}
+                                            onChange={(e) => setNewPlatform({ ...newPlatform, url: e.target.value, valid: null, message: '' })}
+                                            className="w-full px-3 py-2 rounded-lg transition-all duration-300 focus:outline-none placeholder-white/40 text-sm"
+                                            style={glassInput}
+                                            placeholder="Paste review link (Google, Yelp, TripAdvisor...)"
+                                        />
+                                        {newPlatform.message && (
+                                            <p className={`text-xs mt-1 ${newPlatform.valid ? 'text-green-400' : 'text-red-400'}`}>
+                                                {newPlatform.message}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {!newPlatform.valid && (
+                                        <button
+                                            type="button"
+                                            onClick={validatePlatformUrl}
+                                            disabled={!newPlatform.url.trim() || newPlatform.validating}
+                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                                            style={{
+                                                background: 'rgba(102, 126, 234, 0.2)',
+                                                border: '1px solid rgba(102, 126, 234, 0.4)',
+                                                color: '#a5b4fc',
+                                                opacity: (!newPlatform.url.trim() || newPlatform.validating) ? 0.5 : 1
+                                            }}
+                                        >
+                                            {newPlatform.validating ? '...' : 'Check'}
+                                        </button>
+                                    )}
+                                    {newPlatform.valid && (
+                                        <button
+                                            type="button"
+                                            onClick={addPlatform}
+                                            disabled={savingPlatforms}
+                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                                            style={{
+                                                background: 'rgba(34, 197, 94, 0.2)',
+                                                border: '1px solid rgba(34, 197, 94, 0.4)',
+                                                color: '#4ade80'
+                                            }}
+                                        >
+                                            {savingPlatforms ? '...' : '+ Add'}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {platformSuccess && (
+                                    <p className="text-xs text-green-400 mt-2">{platformSuccess}</p>
+                                )}
                             </div>
 
                             {/* Logo URL */}

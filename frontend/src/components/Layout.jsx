@@ -113,6 +113,7 @@ export default function Layout({ children }) {
 
     const navItems = [
         { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+        { path: '/analytics', label: 'Analytics', icon: '📈' },
         { path: '/qr-code', label: 'QR Code', icon: '📱' },
         { path: '/pricing', label: 'Pricing', icon: '💎' },
         { path: '/settings', label: 'Settings', icon: '⚙️' },

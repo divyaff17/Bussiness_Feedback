@@ -85,10 +85,26 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
             .update({ monthly_feedback_count: (business.monthly_feedback_count || 0) + 1 })
             .eq('id', businessId);
 
+        // Get primary review platform URL (with fallback to legacy google_review_url)
+        let reviewUrl = business.google_review_url
+        if (isPositive) {
+            const { data: primaryPlatform } = await supabase
+                .from('review_platforms')
+                .select('url')
+                .eq('business_id', businessId)
+                .eq('is_primary', true)
+                .eq('is_active', true)
+                .single()
+            
+            if (primaryPlatform?.url) {
+                reviewUrl = primaryPlatform.url
+            }
+        }
+
         res.status(201).json({
             message: 'Feedback submitted successfully',
             isPositive,
-            googleReviewUrl: isPositive ? business.google_review_url : null
+            googleReviewUrl: isPositive ? reviewUrl : null
         });
     } catch (error) {
         console.error('Feedback submission error:', error);

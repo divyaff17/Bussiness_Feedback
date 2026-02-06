@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Threads from '../components/Threads'
+import API_URL from '../config/api'
 
 // Inject glass animations
 const GLASS_KEYFRAMES_ID = 'glass-auth-keyframes';
@@ -47,24 +48,130 @@ export default function Signup() {
         businessName: '',
         category: '',
         customCategory: '',
-        googleReviewUrl: '',
         logoUrl: '',
         email: '',
         password: '',
         confirmPassword: ''
     })
+    
+    // Review platforms state (multiple platforms)
+    const [reviewPlatforms, setReviewPlatforms] = useState([
+        { url: '', valid: null, validating: false, message: '', platform: '', label: '' }
+    ])
+    
     const [profileImage, setProfileImage] = useState(null)
     const [profileImagePreview, setProfileImagePreview] = useState(null)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
     const [uploadingImage, setUploadingImage] = useState(false)
     const fileInputRef = useRef(null)
+    
+    // OTP verification states
+    const [showOtpStep, setShowOtpStep] = useState(false)
+    const [otp, setOtp] = useState('')
+    const [otpVerified, setOtpVerified] = useState(false)
+    const [sendingOtp, setSendingOtp] = useState(false)
+    const [verifyingOtp, setVerifyingOtp] = useState(false)
+    const [otpSent, setOtpSent] = useState(false)
+    const [otpCountdown, setOtpCountdown] = useState(0)
 
     const { signup, getApiUrl, updateUser } = useAuth()
     const navigate = useNavigate()
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
+        // Reset OTP verification if email changes
+        if (e.target.name === 'email') {
+            setOtpVerified(false)
+            setShowOtpStep(false)
+            setOtp('')
+            setOtpSent(false)
+        }
+    }
+
+    // Handle platform URL change
+    const handlePlatformChange = (index, value) => {
+        const updated = [...reviewPlatforms]
+        updated[index] = { ...updated[index], url: value, valid: null, message: '', platform: '', label: '' }
+        setReviewPlatforms(updated)
+    }
+
+    // Add new platform
+    const addPlatform = () => {
+        if (reviewPlatforms.length < 5) {
+            setReviewPlatforms([...reviewPlatforms, { url: '', valid: null, validating: false, message: '', platform: '', label: '' }])
+        }
+    }
+
+    // Remove platform
+    const removePlatform = (index) => {
+        if (reviewPlatforms.length > 1) {
+            setReviewPlatforms(reviewPlatforms.filter((_, i) => i !== index))
+        }
+    }
+
+    // Validate Review URL (any platform)
+    const validateReviewUrl = async (index) => {
+        const platform = reviewPlatforms[index]
+        if (!platform.url) {
+            setError('Please enter a URL')
+            return
+        }
+
+        const updated = [...reviewPlatforms]
+        updated[index] = { ...updated[index], validating: true, message: '' }
+        setReviewPlatforms(updated)
+        setError('')
+
+        try {
+            const response = await fetch(`${API_URL}/api/business/validate-review-url`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: platform.url })
+            })
+
+            const data = await response.json()
+
+            updated[index] = { 
+                ...updated[index], 
+                validating: false,
+                valid: data.valid,
+                message: data.message || data.error || '',
+                platform: data.platform || 'custom',
+                label: data.label || 'Custom'
+            }
+            setReviewPlatforms([...updated])
+            
+            if (!data.valid) {
+                setError(data.error || 'Invalid URL')
+            }
+        } catch (err) {
+            updated[index] = { ...updated[index], validating: false, valid: false, message: 'Failed to validate URL' }
+            setReviewPlatforms([...updated])
+            setError('Failed to validate URL')
+        }
+    }
+
+    // Get platform icon
+    const getPlatformIcon = (platform) => {
+        const icons = {
+            google: '🗺️',
+            google_forms: '📋',
+            yelp: '⭐',
+            tripadvisor: '🦉',
+            facebook: '👤',
+            trustpilot: '⭐',
+            zomato: '🍴',
+            swiggy: '🍔',
+            surveymonkey: '📊',
+            typeform: '📝',
+            jotform: '📄',
+            amazon: '📦',
+            booking: '🏨',
+            airbnb: '🏠',
+            custom: '🔗'
+        }
+        return icons[platform] || '🔗'
     }
 
     const handleImageChange = (e) => {
@@ -84,9 +191,108 @@ export default function Signup() {
         }
     }
 
+    // Send OTP to email
+    const handleSendOtp = async () => {
+        if (!formData.email) {
+            setError('Please enter your email address')
+            return
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(formData.email)) {
+            setError('Please enter a valid email address')
+            return
+        }
+
+        setSendingOtp(true)
+        setError('')
+
+        try {
+            const response = await fetch(`${API_URL}/api/auth/send-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    email: formData.email,
+                    businessName: formData.businessName 
+                })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send OTP')
+            }
+
+            setOtpSent(true)
+            setShowOtpStep(true)
+            setOtpCountdown(60) // 60 second countdown for resend
+
+            // Start countdown
+            const interval = setInterval(() => {
+                setOtpCountdown(prev => {
+                    if (prev <= 1) {
+                        clearInterval(interval)
+                        return 0
+                    }
+                    return prev - 1
+                })
+            }, 1000)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setSendingOtp(false)
+        }
+    }
+
+    // Verify OTP
+    const handleVerifyOtp = async () => {
+        if (!otp || otp.length !== 6) {
+            setError('Please enter the 6-digit code')
+            return
+        }
+
+        setVerifyingOtp(true)
+        setError('')
+
+        try {
+            const response = await fetch(`${API_URL}/api/auth/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: formData.email, otp })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Invalid verification code')
+            }
+
+            setOtpVerified(true)
+            setShowOtpStep(false)
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setVerifyingOtp(false)
+        }
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
+
+        // Check if email is verified
+        if (!otpVerified) {
+            setError('Please verify your email address first')
+            return
+        }
+
+        // Check if at least one review platform is validated
+        const validPlatforms = reviewPlatforms.filter(p => p.valid === true && p.url)
+        if (validPlatforms.length === 0) {
+            setError('Please add and validate at least one review platform URL')
+            return
+        }
 
         // Validation
         if (formData.password !== formData.confirmPassword) {
@@ -105,18 +311,6 @@ export default function Signup() {
             return
         }
 
-        // Validate Google Review URL - accept various formats
-        const googleUrl = formData.googleReviewUrl.toLowerCase()
-        const isValidGoogleUrl = googleUrl.includes('google.com') ||
-            googleUrl.includes('g.page') ||
-            googleUrl.includes('goo.gl') ||
-            googleUrl.startsWith('https://')
-
-        if (!isValidGoogleUrl) {
-            setError('Please enter a valid URL (e.g., https://g.page/r/... or your Google Maps link)')
-            return
-        }
-
         setLoading(true)
 
         try {
@@ -125,15 +319,25 @@ export default function Signup() {
                 ? formData.customCategory.trim() 
                 : formData.category
 
+            // Get validated platforms
+            const validPlatforms = reviewPlatforms.filter(p => p.valid === true && p.url)
+            const primaryPlatform = validPlatforms[0] // First one is primary
+
             const signupData = {
                 businessName: formData.businessName,
                 category: finalCategory,
-                googleReviewUrl: formData.googleReviewUrl,
+                googleReviewUrl: primaryPlatform?.url || '', // Use first platform as primary (legacy field)
                 logoUrl: formData.logoUrl || null,
                 email: formData.email,
                 password: formData.password,
                 ownerName: formData.ownerName || null,
-                profilePictureUrl: null
+                profilePictureUrl: null,
+                reviewPlatforms: validPlatforms.map((p, i) => ({
+                    url: p.url,
+                    platform: p.platform,
+                    label: p.label,
+                    isPrimary: i === 0
+                }))
             }
 
             // Sign up the user first
@@ -377,27 +581,93 @@ export default function Signup() {
                             </div>
                         )}
 
-                        {/* Google Review URL */}
+                        {/* Review Platform URLs - Multi-Platform Support */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-2">
-                                Google Review URL *
+                                Review Platform URLs *
+                                <span className="text-xs text-white/40 ml-2">
+                                    (Google, Yelp, TripAdvisor, Google Forms, etc.)
+                                </span>
                             </label>
-                            <input
-                                type="url"
-                                name="googleReviewUrl"
-                                value={formData.googleReviewUrl}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="https://g.page/r/..."
-                                required
-                                disabled={loading}
-                            />
-                            <p className="text-xs text-white/40 mt-1">
-                                Get this from your Google Business Profile
+                            
+                            {reviewPlatforms.map((platform, index) => (
+                                <div key={index} className="mb-3" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                                    <div className="flex gap-2">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="url"
+                                                value={platform.url}
+                                                onChange={(e) => handlePlatformChange(index, e.target.value)}
+                                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none pr-24"
+                                                style={{
+                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                    border: platform.valid === true 
+                                                        ? '1px solid rgba(34, 197, 94, 0.5)' 
+                                                        : platform.valid === false 
+                                                        ? '1px solid rgba(239, 68, 68, 0.5)'
+                                                        : '1px solid rgba(255, 255, 255, 0.1)',
+                                                }}
+                                                placeholder={index === 0 ? "Primary: https://g.page/r/... or any review URL" : "https://..."}
+                                                disabled={loading}
+                                            />
+                                            {platform.valid === true && platform.label && (
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
+                                                    {getPlatformIcon(platform.platform)} {platform.label}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => validateReviewUrl(index)}
+                                            disabled={platform.validating || !platform.url || platform.valid === true}
+                                            className="px-4 py-3 rounded-xl font-medium text-white text-sm transition-all duration-300 whitespace-nowrap"
+                                            style={{
+                                                background: platform.validating || !platform.url 
+                                                    ? 'rgba(255, 255, 255, 0.1)'
+                                                    : platform.valid === true
+                                                    ? 'rgba(34, 197, 94, 0.3)'
+                                                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                opacity: platform.validating || !platform.url ? 0.6 : 1,
+                                            }}
+                                        >
+                                            {platform.validating ? '...' : platform.valid === true ? '✓' : 'Validate'}
+                                        </button>
+                                        {reviewPlatforms.length > 1 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => removePlatform(index)}
+                                                className="px-3 py-3 rounded-xl text-red-400 hover:bg-red-500/20 transition-all duration-300"
+                                                style={{ background: 'rgba(255, 255, 255, 0.05)' }}
+                                            >
+                                                ✕
+                                            </button>
+                                        )}
+                                    </div>
+                                    {platform.message && (
+                                        <p className={`text-xs mt-1 ${platform.valid ? 'text-green-400' : 'text-red-400'}`}>
+                                            {platform.message}
+                                        </p>
+                                    )}
+                                    {index === 0 && (
+                                        <p className="text-xs text-white/40 mt-1">
+                                            ⭐ Primary: Positive feedback will redirect here
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
+                            
+                            {reviewPlatforms.length < 5 && (
+                                <button
+                                    type="button"
+                                    onClick={addPlatform}
+                                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 mt-2"
+                                >
+                                    + Add another review platform
+                                </button>
+                            )}
+                            
+                            <p className="text-xs text-white/40 mt-2">
+                                Supported: Google Maps, Yelp, TripAdvisor, Facebook, Google Forms, SurveyMonkey, Typeform, and more
                             </p>
                         </div>
 
@@ -426,26 +696,94 @@ export default function Signup() {
 
                         <hr className="my-6 border-white/10" />
 
-                        {/* Email */}
+                        {/* Email with OTP Verification */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-2">
                                 Email Address *
+                                {otpVerified && (
+                                    <span className="ml-2 text-green-400 text-xs">✓ Verified</span>
+                                )}
                             </label>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="you@business.com"
-                                required
-                                disabled={loading}
-                            />
+                            <div className="flex gap-2">
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    className="flex-1 px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: otpVerified 
+                                            ? '1px solid rgba(34, 197, 94, 0.5)' 
+                                            : '1px solid rgba(255, 255, 255, 0.1)',
+                                    }}
+                                    placeholder="you@business.com"
+                                    required
+                                    disabled={loading || otpVerified}
+                                />
+                                {!otpVerified && (
+                                    <button
+                                        type="button"
+                                        onClick={handleSendOtp}
+                                        disabled={sendingOtp || !formData.email || otpCountdown > 0}
+                                        className="px-4 py-3 rounded-xl font-medium text-white text-sm transition-all duration-300 whitespace-nowrap"
+                                        style={{
+                                            background: sendingOtp || !formData.email || otpCountdown > 0
+                                                ? 'rgba(255, 255, 255, 0.1)'
+                                                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                            opacity: sendingOtp || !formData.email || otpCountdown > 0 ? 0.6 : 1,
+                                        }}
+                                    >
+                                        {sendingOtp ? '...' : otpCountdown > 0 ? `${otpCountdown}s` : otpSent ? 'Resend' : 'Verify'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
+
+                        {/* OTP Input - shown after sending OTP */}
+                        {showOtpStep && !otpVerified && (
+                            <div className="mb-4" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
+                                <label className="block text-sm font-medium text-white/80 mb-2">
+                                    Enter Verification Code
+                                </label>
+                                <p className="text-xs text-white/50 mb-2">
+                                    We sent a 6-digit code to {formData.email}
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={otp}
+                                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                        className="flex-1 px-4 py-3 rounded-xl text-white text-center text-xl tracking-[0.5em] placeholder-white/40 transition-all duration-300 focus:outline-none font-mono"
+                                        style={{
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(102, 126, 234, 0.5)',
+                                        }}
+                                        placeholder="000000"
+                                        maxLength={6}
+                                        disabled={verifyingOtp}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleVerifyOtp}
+                                        disabled={verifyingOtp || otp.length !== 6}
+                                        className="px-6 py-3 rounded-xl font-medium text-white transition-all duration-300"
+                                        style={{
+                                            background: verifyingOtp || otp.length !== 6
+                                                ? 'rgba(255, 255, 255, 0.1)'
+                                                : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                            opacity: verifyingOtp || otp.length !== 6 ? 0.6 : 1,
+                                        }}
+                                    >
+                                        {verifyingOtp ? (
+                                            <span className="animate-spin">⏳</span>
+                                        ) : (
+                                            '✓'
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Password */}
                         <div className="mb-4">

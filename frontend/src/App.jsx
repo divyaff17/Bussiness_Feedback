@@ -39,6 +39,7 @@ const QRCode = lazy(() => import('./pages/QRCode'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Pricing = lazy(() => import('./pages/Pricing'))
 const Feedback = lazy(() => import('./pages/Feedback'))
+const Analytics = lazy(() => import('./pages/Analytics'))
 
 // Regular imports for lighter pages
 import Login from './pages/Login'
@@ -143,6 +144,11 @@ function AppRoutes() {
             <Route path="/pricing" element={
                 <ProtectedRoute>
                     <Pricing />
+                </ProtectedRoute>
+            } />
+            <Route path="/analytics" element={
+                <ProtectedRoute>
+                    <Analytics />
                 </ProtectedRoute>
             } />
 

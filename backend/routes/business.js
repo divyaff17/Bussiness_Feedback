@@ -37,6 +37,240 @@ router.get('/:id', async (req, res) => {
 });
 
 /**
+ * Detect platform from URL
+ */
+function detectPlatform(url) {
+    const lowerUrl = url.toLowerCase();
+    
+    // Google Maps / Google Business
+    if (lowerUrl.includes('google.com/maps') || 
+        lowerUrl.includes('maps.google.com') ||
+        lowerUrl.includes('g.page') ||
+        lowerUrl.includes('goo.gl') ||
+        lowerUrl.includes('search.google.com/local') ||
+        (lowerUrl.includes('google.com') && lowerUrl.includes('review'))) {
+        return { platform: 'google', label: 'Google Maps' };
+    }
+    
+    // Google Forms
+    if (lowerUrl.includes('docs.google.com/forms') || lowerUrl.includes('forms.gle')) {
+        return { platform: 'google_forms', label: 'Google Forms' };
+    }
+    
+    // Yelp
+    if (lowerUrl.includes('yelp.com')) {
+        return { platform: 'yelp', label: 'Yelp' };
+    }
+    
+    // TripAdvisor
+    if (lowerUrl.includes('tripadvisor.com') || lowerUrl.includes('tripadvisor.')) {
+        return { platform: 'tripadvisor', label: 'TripAdvisor' };
+    }
+    
+    // Facebook
+    if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.com')) {
+        return { platform: 'facebook', label: 'Facebook' };
+    }
+    
+    // Trustpilot
+    if (lowerUrl.includes('trustpilot.com')) {
+        return { platform: 'trustpilot', label: 'Trustpilot' };
+    }
+    
+    // Zomato
+    if (lowerUrl.includes('zomato.com')) {
+        return { platform: 'zomato', label: 'Zomato' };
+    }
+    
+    // Swiggy
+    if (lowerUrl.includes('swiggy.com')) {
+        return { platform: 'swiggy', label: 'Swiggy' };
+    }
+    
+    // SurveyMonkey
+    if (lowerUrl.includes('surveymonkey.com') || lowerUrl.includes('surveymonkey.')) {
+        return { platform: 'surveymonkey', label: 'SurveyMonkey' };
+    }
+    
+    // Typeform
+    if (lowerUrl.includes('typeform.com')) {
+        return { platform: 'typeform', label: 'Typeform' };
+    }
+    
+    // JotForm
+    if (lowerUrl.includes('jotform.com')) {
+        return { platform: 'jotform', label: 'JotForm' };
+    }
+    
+    // Amazon
+    if (lowerUrl.includes('amazon.com') || lowerUrl.includes('amazon.in')) {
+        return { platform: 'amazon', label: 'Amazon' };
+    }
+    
+    // Booking.com
+    if (lowerUrl.includes('booking.com')) {
+        return { platform: 'booking', label: 'Booking.com' };
+    }
+    
+    // Airbnb
+    if (lowerUrl.includes('airbnb.com') || lowerUrl.includes('airbnb.')) {
+        return { platform: 'airbnb', label: 'Airbnb' };
+    }
+    
+    // Default: custom platform
+    return { platform: 'custom', label: 'Custom' };
+}
+
+/**
+ * POST /api/business/validate-review-url
+ * Validate any review platform URL (replaces validate-google-url)
+ */
+router.post('/validate-review-url', async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ valid: false, error: 'URL is required' });
+        }
+
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch {
+            return res.json({ 
+                valid: false, 
+                error: 'Invalid URL format. Please enter a valid URL starting with http:// or https://'
+            });
+        }
+
+        // Detect platform
+        const { platform, label } = detectPlatform(url);
+
+        // Try to fetch the URL to verify it's accessible
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const response = await fetch(url, {
+                method: 'HEAD',
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; FeedbackBot/1.0)'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok || response.status === 301 || response.status === 302 || response.status === 307) {
+                return res.json({ 
+                    valid: true, 
+                    platform,
+                    label,
+                    message: `${label} URL is valid and accessible`
+                });
+            } else {
+                return res.json({ 
+                    valid: true, // Still allow it
+                    platform,
+                    label,
+                    warning: `URL returned status ${response.status}, but format is correct`
+                });
+            }
+        } catch (fetchError) {
+            // Allow URL if format is valid even if we can't fetch it
+            return res.json({ 
+                valid: true, 
+                platform,
+                label,
+                message: 'URL format is valid',
+                warning: 'Could not verify accessibility, but URL format appears correct'
+            });
+        }
+    } catch (error) {
+        console.error('Validate review URL error:', error);
+        res.status(500).json({ valid: false, error: 'Failed to validate URL' });
+    }
+});
+
+// Keep old endpoint for backwards compatibility
+router.post('/validate-google-url', async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ valid: false, error: 'URL is required' });
+        }
+
+        // Check URL format first
+        const lowerUrl = url.toLowerCase();
+        const isValidFormat = 
+            lowerUrl.includes('google.com/maps') ||
+            lowerUrl.includes('maps.google.com') ||
+            lowerUrl.includes('g.page') ||
+            lowerUrl.includes('goo.gl') ||
+            lowerUrl.includes('search.google.com/local') ||
+            (lowerUrl.includes('google.com') && lowerUrl.includes('review'));
+
+        if (!isValidFormat) {
+            return res.json({ 
+                valid: false, 
+                error: 'URL does not appear to be a valid Google review link. Please use a link from Google Maps or Google Business Profile.',
+                suggestion: 'Valid formats: https://g.page/r/..., https://maps.google.com/..., or your Google Maps business link'
+            });
+        }
+
+        // Try to fetch the URL to verify it's accessible
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch(url, {
+                method: 'HEAD',
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (compatible; FeedbackBot/1.0)'
+                }
+            });
+
+            clearTimeout(timeoutId);
+
+            // Check for successful response or redirect (Google often redirects)
+            if (response.ok || response.status === 301 || response.status === 302 || response.status === 307) {
+                return res.json({ 
+                    valid: true, 
+                    message: 'Google review URL is valid and accessible'
+                });
+            } else {
+                return res.json({ 
+                    valid: false, 
+                    error: `URL returned status ${response.status}. Please verify the link is correct.`
+                });
+            }
+        } catch (fetchError) {
+            // If fetch fails, still allow the URL if it has the right format
+            // Some Google URLs may block bots but still work for users
+            if (fetchError.name === 'AbortError') {
+                return res.json({ 
+                    valid: true, 
+                    message: 'URL format is valid (response timeout - may still work)',
+                    warning: 'Could not fully verify the URL, but format appears correct'
+                });
+            }
+            
+            console.log('URL validation fetch error:', fetchError.message);
+            return res.json({ 
+                valid: true, 
+                message: 'URL format is valid',
+                warning: 'Could not fully verify accessibility, but format appears correct'
+            });
+        }
+    } catch (error) {
+        console.error('Validate Google URL error:', error);
+        res.status(500).json({ valid: false, error: 'Failed to validate URL' });
+    }
+});
+
+/**
  * PUT /api/business/:id
  * Update business info (authenticated)
  */
@@ -70,6 +304,223 @@ router.put('/:id', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Update business error:', error);
         res.status(500).json({ error: 'Failed to update business' });
+    }
+});
+
+/**
+ * GET /api/business/:id/platforms
+ * Get all review platforms for a business
+ */
+router.get('/:id/platforms', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { data: platforms, error } = await supabase
+            .from('review_platforms')
+            .select('*')
+            .eq('business_id', id)
+            .eq('is_active', true)
+            .order('is_primary', { ascending: false })
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Get platforms error:', error);
+            return res.status(500).json({ error: 'Failed to get platforms' });
+        }
+
+        res.json({ platforms: platforms || [] });
+    } catch (error) {
+        console.error('Get platforms error:', error);
+        res.status(500).json({ error: 'Failed to get platforms' });
+    }
+});
+
+/**
+ * POST /api/business/:id/platforms
+ * Add a new review platform
+ */
+router.post('/:id/platforms', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { businessId } = req.user;
+        const { url, isPrimary = false, customLabel } = req.body;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        // Detect platform
+        const { platform, label } = detectPlatform(url);
+        const finalLabel = customLabel || label;
+
+        // If setting as primary, unset other primaries
+        if (isPrimary) {
+            await supabase
+                .from('review_platforms')
+                .update({ is_primary: false })
+                .eq('business_id', id);
+        }
+
+        // Check for duplicate URL
+        const { data: existing } = await supabase
+            .from('review_platforms')
+            .select('id')
+            .eq('business_id', id)
+            .eq('url', url)
+            .single();
+
+        if (existing) {
+            return res.status(400).json({ error: 'This URL is already added' });
+        }
+
+        // Insert new platform
+        const { data: newPlatform, error } = await supabase
+            .from('review_platforms')
+            .insert({
+                business_id: id,
+                platform_name: platform,
+                platform_label: finalLabel,
+                url,
+                is_primary: isPrimary,
+                is_active: true
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Add platform error:', error);
+            return res.status(500).json({ error: 'Failed to add platform' });
+        }
+
+        // Also update the legacy google_review_url if this is primary
+        if (isPrimary) {
+            await supabase
+                .from('businesses')
+                .update({ google_review_url: url })
+                .eq('id', id);
+        }
+
+        res.json({ 
+            message: 'Platform added successfully',
+            platform: newPlatform
+        });
+    } catch (error) {
+        console.error('Add platform error:', error);
+        res.status(500).json({ error: 'Failed to add platform' });
+    }
+});
+
+/**
+ * PUT /api/business/:id/platforms/:platformId
+ * Update a review platform
+ */
+router.put('/:id/platforms/:platformId', authenticate, async (req, res) => {
+    try {
+        const { id, platformId } = req.params;
+        const { businessId } = req.user;
+        const { url, isPrimary, customLabel, isActive } = req.body;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const updates = {};
+        
+        if (url) {
+            const { platform, label } = detectPlatform(url);
+            updates.url = url;
+            updates.platform_name = platform;
+            updates.platform_label = customLabel || label;
+        }
+        
+        if (customLabel) {
+            updates.platform_label = customLabel;
+        }
+        
+        if (typeof isActive === 'boolean') {
+            updates.is_active = isActive;
+        }
+
+        // Handle primary flag
+        if (isPrimary === true) {
+            // Unset other primaries first
+            await supabase
+                .from('review_platforms')
+                .update({ is_primary: false })
+                .eq('business_id', id);
+            updates.is_primary = true;
+        } else if (isPrimary === false) {
+            updates.is_primary = false;
+        }
+
+        const { data: updatedPlatform, error } = await supabase
+            .from('review_platforms')
+            .update(updates)
+            .eq('id', platformId)
+            .eq('business_id', id)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Update platform error:', error);
+            return res.status(500).json({ error: 'Failed to update platform' });
+        }
+
+        // Update legacy google_review_url if this became primary
+        if (updates.is_primary && updatedPlatform?.url) {
+            await supabase
+                .from('businesses')
+                .update({ google_review_url: updatedPlatform.url })
+                .eq('id', id);
+        }
+
+        res.json({ 
+            message: 'Platform updated successfully',
+            platform: updatedPlatform
+        });
+    } catch (error) {
+        console.error('Update platform error:', error);
+        res.status(500).json({ error: 'Failed to update platform' });
+    }
+});
+
+/**
+ * DELETE /api/business/:id/platforms/:platformId
+ * Delete a review platform
+ */
+router.delete('/:id/platforms/:platformId', authenticate, async (req, res) => {
+    try {
+        const { id, platformId } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { error } = await supabase
+            .from('review_platforms')
+            .delete()
+            .eq('id', platformId)
+            .eq('business_id', id);
+
+        if (error) {
+            console.error('Delete platform error:', error);
+            return res.status(500).json({ error: 'Failed to delete platform' });
+        }
+
+        res.json({ message: 'Platform deleted successfully' });
+    } catch (error) {
+        console.error('Delete platform error:', error);
+        res.status(500).json({ error: 'Failed to delete platform' });
     }
 });
 
@@ -136,11 +587,13 @@ router.get('/:id/stats', authenticate, async (req, res) => {
         }
 
         // Build date filter
-        let dateFilter = '';
+        let dateFilter = null;
         const now = new Date();
 
         if (filter === 'today') {
-            dateFilter = now.toISOString().split('T')[0];
+            // Start of today (local time converted to UTC)
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            dateFilter = today.toISOString();
         } else if (filter === 'week') {
             const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             dateFilter = weekAgo.toISOString();
@@ -293,6 +746,181 @@ router.post('/:id/alerts/mark-notified', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Mark notified error:', error);
         res.status(500).json({ error: 'Failed to mark as notified' });
+    }
+});
+
+/**
+ * GET /api/business/:id/analytics
+ * Get analytics data for charts (authenticated)
+ * Query params:
+ * - range: 'week', 'month', 'year', 'custom'
+ * - startDate: ISO date string (for custom range)
+ * - endDate: ISO date string (for custom range)
+ */
+router.get('/:id/analytics', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { businessId } = req.user;
+        const { range, startDate, endDate } = req.query;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized to access this business' });
+        }
+
+        const now = new Date();
+        let fromDate, toDate = now;
+        let groupBy = 'day'; // day, week, month
+
+        // Calculate date range
+        if (range === 'week') {
+            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            groupBy = 'day';
+        } else if (range === 'month') {
+            fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            groupBy = 'day';
+        } else if (range === 'year') {
+            fromDate = new Date(now.getFullYear(), 0, 1); // Start of year
+            groupBy = 'month';
+        } else if (range === 'custom' && startDate && endDate) {
+            fromDate = new Date(startDate);
+            toDate = new Date(endDate);
+            // If range > 60 days, group by week; if > 180 days, group by month
+            const daysDiff = (toDate - fromDate) / (1000 * 60 * 60 * 24);
+            if (daysDiff > 180) groupBy = 'month';
+            else if (daysDiff > 60) groupBy = 'week';
+            else groupBy = 'day';
+        } else {
+            // Default: last 7 days
+            fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            groupBy = 'day';
+        }
+
+        // Fetch all feedbacks in range
+        const { data: feedbacks, error } = await supabase
+            .from('feedbacks')
+            .select('rating, is_positive, created_at')
+            .eq('business_id', id)
+            .gte('created_at', fromDate.toISOString())
+            .lte('created_at', toDate.toISOString())
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            return res.status(500).json({ error: 'Failed to get analytics data' });
+        }
+
+        // Group data by date
+        const groupedData = {};
+        const labels = [];
+
+        // Generate all date labels in range
+        const currentDate = new Date(fromDate);
+        while (currentDate <= toDate) {
+            let label;
+            if (groupBy === 'day') {
+                label = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            } else if (groupBy === 'week') {
+                // Get week number
+                const weekStart = new Date(currentDate);
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                label = `Week ${weekStart.toISOString().split('T')[0]}`;
+            } else { // month
+                label = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            }
+
+            if (!labels.includes(label)) {
+                labels.push(label);
+                groupedData[label] = { positive: 0, negative: 0, total: 0, ratings: [] };
+            }
+
+            // Advance date
+            if (groupBy === 'day') {
+                currentDate.setDate(currentDate.getDate() + 1);
+            } else if (groupBy === 'week') {
+                currentDate.setDate(currentDate.getDate() + 7);
+            } else {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+        }
+
+        // Populate with actual data
+        feedbacks.forEach(feedback => {
+            const date = new Date(feedback.created_at);
+            let label;
+            if (groupBy === 'day') {
+                label = date.toISOString().split('T')[0];
+            } else if (groupBy === 'week') {
+                const weekStart = new Date(date);
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+                label = `Week ${weekStart.toISOString().split('T')[0]}`;
+            } else {
+                label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            }
+
+            if (groupedData[label]) {
+                groupedData[label].total++;
+                groupedData[label].ratings.push(feedback.rating);
+                if (feedback.is_positive) {
+                    groupedData[label].positive++;
+                } else {
+                    groupedData[label].negative++;
+                }
+            }
+        });
+
+        // Calculate averages and format for chart
+        const chartData = labels.map(label => {
+            const data = groupedData[label];
+            const avgRating = data.ratings.length > 0 
+                ? (data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length).toFixed(1)
+                : 0;
+            
+            // Format label for display
+            let displayLabel = label;
+            if (groupBy === 'day') {
+                const d = new Date(label);
+                displayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            } else if (groupBy === 'month') {
+                const [year, month] = label.split('-');
+                const d = new Date(year, parseInt(month) - 1);
+                displayLabel = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+            }
+
+            return {
+                date: label,
+                label: displayLabel,
+                total: data.total,
+                positive: data.positive,
+                negative: data.negative,
+                avgRating: parseFloat(avgRating)
+            };
+        });
+
+        // Calculate summary stats
+        const totalFeedback = feedbacks.length;
+        const totalPositive = feedbacks.filter(f => f.is_positive).length;
+        const totalNegative = totalFeedback - totalPositive;
+        const avgRating = totalFeedback > 0
+            ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / totalFeedback).toFixed(1)
+            : 0;
+
+        res.json({
+            chartData,
+            summary: {
+                total: totalFeedback,
+                positive: totalPositive,
+                negative: totalNegative,
+                avgRating: parseFloat(avgRating),
+                positiveRate: totalFeedback > 0 ? Math.round((totalPositive / totalFeedback) * 100) : 0
+            },
+            range: {
+                from: fromDate.toISOString(),
+                to: toDate.toISOString(),
+                groupBy
+            }
+        });
+    } catch (error) {
+        console.error('Analytics error:', error);
+        res.status(500).json({ error: 'Failed to get analytics data' });
     }
 });
 

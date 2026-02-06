@@ -5,8 +5,131 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../db/supabase.js';
 import { generateToken, authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
+import { generateOTP, sendOTPEmail } from '../services/email.js';
 
 const router = express.Router();
+
+/**
+ * POST /api/auth/send-otp
+ * Send OTP verification code to email
+ */
+router.post('/send-otp', authLimiter, async (req, res) => {
+    try {
+        const { email, businessName } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        // Check if email already exists
+        const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('email', email.toLowerCase())
+            .single();
+
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        // Invalidate any existing OTPs for this email
+        await supabase
+            .from('email_verification_otps')
+            .update({ verified: true })
+            .eq('email', email.toLowerCase())
+            .eq('verified', false);
+
+        // Generate new OTP
+        const otp = generateOTP();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Store OTP in database
+        const { error: insertError } = await supabase
+            .from('email_verification_otps')
+            .insert({
+                email: email.toLowerCase(),
+                otp_code: otp,
+                expires_at: expiresAt.toISOString(),
+                verified: false,
+                attempts: 0
+            });
+
+        if (insertError) {
+            console.error('OTP insert error:', insertError);
+            return res.status(500).json({ error: 'Failed to generate OTP' });
+        }
+
+        // Send OTP email
+        await sendOTPEmail(email, otp, businessName);
+
+        res.json({ 
+            message: 'Verification code sent to your email',
+            expiresIn: 600 // 10 minutes in seconds
+        });
+    } catch (error) {
+        console.error('Send OTP error:', error);
+        res.status(500).json({ error: 'Failed to send verification code' });
+    }
+});
+
+/**
+ * POST /api/auth/verify-otp
+ * Verify OTP code
+ */
+router.post('/verify-otp', authLimiter, async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({ error: 'Email and OTP are required' });
+        }
+
+        // Find valid OTP
+        const { data: otpRecord, error: otpError } = await supabase
+            .from('email_verification_otps')
+            .select('*')
+            .eq('email', email.toLowerCase())
+            .eq('otp_code', otp)
+            .eq('verified', false)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (otpError || !otpRecord) {
+            return res.status(400).json({ error: 'Invalid verification code' });
+        }
+
+        // Check if expired
+        if (new Date(otpRecord.expires_at) < new Date()) {
+            return res.status(400).json({ error: 'Verification code has expired' });
+        }
+
+        // Check attempts (max 5)
+        if (otpRecord.attempts >= 5) {
+            return res.status(400).json({ error: 'Too many attempts. Please request a new code.' });
+        }
+
+        // Increment attempts
+        await supabase
+            .from('email_verification_otps')
+            .update({ attempts: otpRecord.attempts + 1 })
+            .eq('id', otpRecord.id);
+
+        // Mark as verified
+        await supabase
+            .from('email_verification_otps')
+            .update({ verified: true })
+            .eq('id', otpRecord.id);
+
+        res.json({ 
+            verified: true,
+            message: 'Email verified successfully'
+        });
+    } catch (error) {
+        console.error('Verify OTP error:', error);
+        res.status(500).json({ error: 'Failed to verify code' });
+    }
+});
 
 /**
  * POST /api/auth/signup
@@ -14,10 +137,13 @@ const router = express.Router();
  */
 router.post('/signup', authLimiter, async (req, res) => {
     try {
-        const { email, password, businessName, category, googleReviewUrl, ownerName, profilePictureUrl } = req.body;
+        const { email, password, businessName, category, googleReviewUrl, ownerName, profilePictureUrl, reviewPlatforms } = req.body;
 
-        // Validation
-        if (!email || !password || !businessName || !category || !googleReviewUrl) {
+        // Validation - support both legacy googleReviewUrl and new reviewPlatforms
+        const hasReviewPlatforms = Array.isArray(reviewPlatforms) && reviewPlatforms.length > 0;
+        const hasLegacyUrl = googleReviewUrl && googleReviewUrl.trim();
+        
+        if (!email || !password || !businessName || !category || (!hasReviewPlatforms && !hasLegacyUrl)) {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
@@ -79,6 +205,27 @@ router.post('/signup', authLimiter, async (req, res) => {
             // Rollback business creation
             await supabase.from('businesses').delete().eq('id', businessId);
             return res.status(500).json({ error: 'Failed to create user' });
+        }
+
+        // Insert review platforms if provided
+        if (hasReviewPlatforms) {
+            const platformsToInsert = reviewPlatforms.map((p, idx) => ({
+                business_id: businessId,
+                platform_name: p.platform || 'custom',
+                platform_label: p.label || p.platform || 'Review Link',
+                url: p.url,
+                is_primary: p.isPrimary || idx === 0,
+                is_active: true
+            }));
+
+            const { error: platformError } = await supabase
+                .from('review_platforms')
+                .insert(platformsToInsert);
+
+            if (platformError) {
+                console.error('Review platforms insert error:', platformError);
+                // Don't fail signup, just log the error
+            }
         }
 
         // Generate JWT

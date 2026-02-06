@@ -19,6 +19,7 @@ export default function Dashboard() {
     const [stats, setStats] = useState({ total: 0, positive: 0, negative: 0 })
     const [feedbacks, setFeedbacks] = useState([])
     const [filter, setFilter] = useState('today')
+    const [feedbackType, setFeedbackType] = useState('all') // 'all', 'positive', 'negative'
     const [loading, setLoading] = useState(true)
     const [lastUpdated, setLastUpdated] = useState(new Date())
 
@@ -32,7 +33,7 @@ export default function Dashboard() {
         }, 10000)
 
         return () => clearInterval(interval)
-    }, [filter])
+    }, [filter, feedbackType])
 
     const fetchData = async (showLoading = true) => {
         if (showLoading) setLoading(true)
@@ -55,8 +56,9 @@ export default function Dashboard() {
                 return
             }
 
-            // Fetch negative feedbacks
-            const feedbackRes = await fetch(`${API_URL}/api/feedback/${user.businessId}?filter=${filter}&type=negative`, { headers })
+            // Fetch feedbacks based on type filter
+            const typeParam = feedbackType === 'all' ? '' : `&type=${feedbackType}`
+            const feedbackRes = await fetch(`${API_URL}/api/feedback/${user.businessId}?filter=${filter}${typeParam}`, { headers })
             if (feedbackRes.ok) {
                 const feedbackData = await feedbackRes.json()
                 setFeedbacks(feedbackData.feedbacks || [])
@@ -77,8 +79,27 @@ export default function Dashboard() {
     ]
 
     const formatTime = (dateString) => {
+        if (!dateString) return 'Unknown time'
         const date = new Date(dateString)
+        if (isNaN(date.getTime())) return 'Invalid time'
         return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
+    }
+
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Unknown date'
+        const date = new Date(dateString)
+        if (isNaN(date.getTime())) return 'Invalid date'
+        const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        
+        if (date.toDateString() === today.toDateString()) {
+            return 'Today'
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            return 'Yesterday'
+        } else {
+            return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+        }
     }
 
     const getFilterLabel = () => {
@@ -255,45 +276,118 @@ export default function Dashboard() {
                         </div>
                         </ElectricBorder>
 
-                        {/* Recent Negative Feedback List */}
-                        <ElectricBorder color="#f43f5e" speed={1.2} chaos={0.15} borderRadius={24}>
+                        {/* Recent Feedback List with Type Filter */}
+                        <ElectricBorder color={feedbackType === 'positive' ? '#22c55e' : feedbackType === 'negative' ? '#f43f5e' : '#667eea'} speed={1.2} chaos={0.15} borderRadius={24}>
                         <div className="p-6" style={glassCard}>
-                            <h2 
-                                className="text-lg font-bold mb-4"
-                                style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}
-                            >
-                                Recent Negative Feedback
-                            </h2>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                                <h2 
+                                    className="text-lg font-bold"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
+                                    }}
+                                >
+                                    {feedbackType === 'all' ? 'All Feedback' : feedbackType === 'positive' ? 'Positive Feedback' : 'Negative Feedback'}
+                                </h2>
+                                
+                                {/* Feedback Type Filter */}
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setFeedbackType('all')}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
+                                        style={feedbackType === 'all' ? {
+                                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                            border: '1px solid rgba(102, 126, 234, 0.5)',
+                                            color: '#a5b4fc',
+                                        } : {
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            color: 'rgba(255, 255, 255, 0.6)',
+                                        }}
+                                    >
+                                        All ({stats.total})
+                                    </button>
+                                    <button
+                                        onClick={() => setFeedbackType('positive')}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
+                                        style={feedbackType === 'positive' ? {
+                                            background: 'rgba(34, 197, 94, 0.3)',
+                                            border: '1px solid rgba(34, 197, 94, 0.5)',
+                                            color: '#4ade80',
+                                        } : {
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            color: 'rgba(255, 255, 255, 0.6)',
+                                        }}
+                                    >
+                                        ⭐ Positive ({stats.positive})
+                                    </button>
+                                    <button
+                                        onClick={() => setFeedbackType('negative')}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
+                                        style={feedbackType === 'negative' ? {
+                                            background: 'rgba(239, 68, 68, 0.3)',
+                                            border: '1px solid rgba(239, 68, 68, 0.5)',
+                                            color: '#f87171',
+                                        } : {
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                            color: 'rgba(255, 255, 255, 0.6)',
+                                        }}
+                                    >
+                                        ⚠️ Negative ({stats.negative})
+                                    </button>
+                                </div>
+                            </div>
 
                             {feedbacks.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <span className="text-4xl block mb-2">🎉</span>
-                                    <p className="text-white/60">No negative feedback {getFilterLabel()}!</p>
+                                    <span className="text-4xl block mb-2">{feedbackType === 'negative' ? '🎉' : '📭'}</span>
+                                    <p className="text-white/60">
+                                        {feedbackType === 'negative' 
+                                            ? `No negative feedback ${getFilterLabel()}!` 
+                                            : feedbackType === 'positive'
+                                            ? `No positive feedback ${getFilterLabel()}`
+                                            : `No feedback ${getFilterLabel()}`}
+                                    </p>
                                 </div>
                             ) : (
-                                <ul className="space-y-3">
+                                <ul className="space-y-3 max-h-96 overflow-y-auto">
                                     {feedbacks.map((feedback) => (
                                         <li
                                             key={feedback.id}
                                             className="flex items-start justify-between p-4 rounded-xl"
-                                            style={{
+                                            style={feedback.is_positive ? {
+                                                background: 'rgba(34, 197, 94, 0.1)',
+                                                borderLeft: '4px solid rgba(74, 222, 128, 0.6)',
+                                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                                            } : {
                                                 background: 'rgba(239, 68, 68, 0.1)',
                                                 borderLeft: '4px solid rgba(248, 113, 113, 0.6)',
                                                 border: '1px solid rgba(239, 68, 68, 0.2)',
                                             }}
                                         >
                                             <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-yellow-400">
+                                                        {'★'.repeat(feedback.rating)}{'☆'.repeat(5 - feedback.rating)}
+                                                    </span>
+                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                        feedback.is_positive 
+                                                            ? 'bg-green-500/20 text-green-400' 
+                                                            : 'bg-red-500/20 text-red-400'
+                                                    }`}>
+                                                        {feedback.is_positive ? 'Positive' : 'Negative'}
+                                                    </span>
+                                                </div>
                                                 <p className="text-white/90">
                                                     "{feedback.message || 'No message provided'}"
                                                 </p>
                                             </div>
                                             <span className="text-sm text-white/50 ml-4 whitespace-nowrap">
-                                                – {formatTime(feedback.createdAt)}
+                                                {formatDate(feedback.created_at)} {formatTime(feedback.created_at)}
                                             </span>
                                         </li>
                                     ))}

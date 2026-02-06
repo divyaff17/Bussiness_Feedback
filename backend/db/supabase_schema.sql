@@ -91,6 +91,46 @@ CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tok
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 
 -- ============================================
+-- TABLE 5: EMAIL VERIFICATION OTPs
+-- Stores OTP codes for email verification during signup
+-- ============================================
+CREATE TABLE IF NOT EXISTS email_verification_otps (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email TEXT NOT NULL,
+    otp_code TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    verified BOOLEAN DEFAULT FALSE,
+    attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_email ON email_verification_otps(email);
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_otp_code ON email_verification_otps(otp_code);
+
+-- ============================================
+-- TABLE 6: REVIEW PLATFORMS
+-- Stores multiple review platform URLs per business
+-- Supports: Google Maps, Yelp, TripAdvisor, Google Forms, etc.
+-- ============================================
+CREATE TABLE IF NOT EXISTS review_platforms (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    platform_name TEXT NOT NULL, -- 'google', 'yelp', 'tripadvisor', 'google_forms', 'facebook', 'custom'
+    platform_label TEXT, -- Display name like "Google Maps", "Yelp", etc.
+    url TEXT NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE, -- Primary platform for positive redirects
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_platforms_business_id ON review_platforms(business_id);
+CREATE INDEX IF NOT EXISTS idx_review_platforms_platform ON review_platforms(platform_name);
+
+-- RLS for review_platforms
+ALTER TABLE review_platforms ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on review_platforms" ON review_platforms FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================
 -- ROW LEVEL SECURITY (RLS)
 -- Enable but allow all operations (auth handled in backend)
 -- ============================================
@@ -102,6 +142,7 @@ ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all on businesses" ON businesses FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on feedbacks" ON feedbacks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY IF NOT EXISTS "Allow all on email_verification_otps" ON email_verification_otps FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================
 -- SUCCESS! Tables created.
