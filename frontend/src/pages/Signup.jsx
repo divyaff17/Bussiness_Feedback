@@ -442,7 +442,7 @@ export default function Signup() {
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                             }}
                         >
-                            <span className="text-3xl">✨</span>
+                            <span className="text-3xl" style={{ filter: 'drop-shadow(0 0 6px rgba(165, 180, 252, 0.5))' }}>⚓</span>
                         </div>
                         <h1 
                             className="text-3xl font-bold mb-2"
@@ -453,9 +453,9 @@ export default function Signup() {
                                 backgroundClip: 'text',
                             }}
                         >
-                            Create Account
+                            Join ReviewDock
                         </h1>
-                        <p className="text-white/60">Set up your feedback system in minutes</p>
+                        <p className="text-white/60">Set up your review system in minutes</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="relative">

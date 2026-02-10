@@ -114,9 +114,10 @@ export default function Login() {
                             style={{
                                 background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
+                                boxShadow: '0 0 30px rgba(102, 126, 234, 0.2)',
                             }}
                         >
-                            <span className="text-3xl">👋</span>
+                            <span className="text-3xl" style={{ filter: 'drop-shadow(0 0 6px rgba(165, 180, 252, 0.5))' }}>⚓</span>
                         </div>
                         <h1 
                             className="text-3xl font-bold mb-2"
@@ -127,9 +128,9 @@ export default function Login() {
                                 backgroundClip: 'text',
                             }}
                         >
-                            Welcome Back
+                            Welcome to ReviewDock
                         </h1>
-                        <p className="text-white/60">Sign in to manage your feedback</p>
+                        <p className="text-white/60">Sign in to your dashboard</p>
                     </div>
 
                     <form onSubmit={handleSubmit} className="relative">

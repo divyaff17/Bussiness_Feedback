@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
-import ElectricBorder from '../components/ElectricBorder'
 import API_URL from '../config/api'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -240,8 +239,7 @@ export default function Analytics() {
 
                 {/* Custom Date Picker */}
                 {showCustom && (
-                    <ElectricBorder color="#667eea" speed={0.8} chaos={0.1} borderRadius={24} className="mb-6">
-                        <div className="p-4" style={glassCard}>
+                    <div className="p-4 mb-6" style={glassCard}>
                             <div className="flex flex-wrap items-center gap-4">
                                 <div>
                                     <label className="block text-xs text-white/60 mb-1">From Date</label>
@@ -290,7 +288,6 @@ export default function Analytics() {
                                 </button>
                             </div>
                         </div>
-                    </ElectricBorder>
                 )}
 
                 {loading ? (
@@ -304,41 +301,30 @@ export default function Analytics() {
                     <>
                         {/* Summary Stats */}
                         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                            <ElectricBorder color="#667eea" speed={0.6} chaos={0.08} borderRadius={16}>
-                                <div className="p-4 text-center" style={glassCard}>
+                            <div className="p-4 text-center" style={glassCard}>
                                     <p className="text-3xl font-bold text-blue-400">{analyticsData.summary.total}</p>
                                     <p className="text-xs text-white/60">Total Feedback</p>
                                 </div>
-                            </ElectricBorder>
-                            <ElectricBorder color="#22c55e" speed={0.6} chaos={0.08} borderRadius={16}>
-                                <div className="p-4 text-center" style={glassCard}>
+                            <div className="p-4 text-center" style={glassCard}>
                                     <p className="text-3xl font-bold text-green-400">{analyticsData.summary.positive}</p>
                                     <p className="text-xs text-white/60">Positive</p>
                                 </div>
-                            </ElectricBorder>
-                            <ElectricBorder color="#ef4444" speed={0.6} chaos={0.08} borderRadius={16}>
-                                <div className="p-4 text-center" style={glassCard}>
+                            <div className="p-4 text-center" style={glassCard}>
                                     <p className="text-3xl font-bold text-red-400">{analyticsData.summary.negative}</p>
                                     <p className="text-xs text-white/60">Negative</p>
                                 </div>
-                            </ElectricBorder>
-                            <ElectricBorder color="#f59e0b" speed={0.6} chaos={0.08} borderRadius={16}>
-                                <div className="p-4 text-center" style={glassCard}>
+                            <div className="p-4 text-center" style={glassCard}>
                                     <p className="text-3xl font-bold text-yellow-400">⭐ {analyticsData.summary.avgRating}</p>
                                     <p className="text-xs text-white/60">Avg Rating</p>
                                 </div>
-                            </ElectricBorder>
-                            <ElectricBorder color="#14b8a6" speed={0.6} chaos={0.08} borderRadius={16}>
-                                <div className="p-4 text-center" style={glassCard}>
+                            <div className="p-4 text-center" style={glassCard}>
                                     <p className="text-3xl font-bold text-teal-400">{analyticsData.summary.positiveRate}%</p>
                                     <p className="text-xs text-white/60">Positive Rate</p>
                                 </div>
-                            </ElectricBorder>
                         </div>
 
                         {/* Main Chart */}
-                        <ElectricBorder color="#667eea" speed={1} chaos={0.12} borderRadius={24} className="mb-6">
-                            <div className="p-6" style={glassCard}>
+                        <div className="p-6 mb-6" style={glassCard}>
                                 <div className="flex justify-between items-center mb-4">
                                     <h2 
                                         className="text-lg font-bold"
@@ -389,13 +375,11 @@ export default function Analytics() {
                                     )}
                                 </div>
                             </div>
-                        </ElectricBorder>
 
                         {/* Pie Chart & Rating Distribution */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Pie Chart */}
-                            <ElectricBorder color="#22c55e" speed={0.8} chaos={0.1} borderRadius={24}>
-                                <div className="p-6" style={glassCard}>
+                            <div className="p-6" style={glassCard}>
                                     <h2 
                                         className="text-lg font-bold mb-4"
                                         style={{
@@ -434,12 +418,10 @@ export default function Analytics() {
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            </ElectricBorder>
+                            </div>
 
                             {/* Average Rating Trend */}
-                            <ElectricBorder color="#f59e0b" speed={0.8} chaos={0.1} borderRadius={24}>
-                                <div className="p-6" style={glassCard}>
+                            <div className="p-6" style={glassCard}>
                                     <h2 
                                         className="text-lg font-bold mb-4"
                                         style={{
@@ -476,7 +458,6 @@ export default function Analytics() {
                                         )}
                                     </div>
                                 </div>
-                            </ElectricBorder>
                         </div>
                     </>
                 ) : (

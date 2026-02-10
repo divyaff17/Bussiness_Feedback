@@ -45,6 +45,9 @@ export default function ThankYou() {
                         ← Back to home
                     </Link>
                 </div>
+                <p className="text-center text-xs text-gray-400 mt-4">
+                    Powered by <span className="font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">ReviewDock</span>
+                </p>
             </div>
         </div>
     )

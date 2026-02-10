@@ -13,21 +13,34 @@ export default function Feedback() {
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState(null)
     const [error, setError] = useState(null)
+    const [errorType, setErrorType] = useState(null) // 'network' | 'not_found' | 'server'
 
     useEffect(() => {
         fetchBusiness()
     }, [businessId])
 
     const fetchBusiness = async () => {
+        setLoading(true)
+        setError(null)
+        setErrorType(null)
         try {
             const response = await fetch(`${API_URL}/api/business/${businessId}`)
+            if (response.status === 404) {
+                setError('This business was not found.')
+                setErrorType('not_found')
+                return
+            }
             if (!response.ok) {
-                throw new Error('Business not found')
+                setError(`Server error (${response.status}). Please try again.`)
+                setErrorType('server')
+                return
             }
             const data = await response.json()
             setBusiness(data)
         } catch (err) {
-            setError('This feedback page is not available.')
+            console.error('Feedback page fetch error:', err)
+            setError('Could not connect to the server. Please check your internet connection and try again.')
+            setErrorType('network')
         } finally {
             setLoading(false)
         }
@@ -99,9 +112,19 @@ export default function Feedback() {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="card text-center max-w-md animate-fadeIn">
-                    <div className="text-6xl mb-4">😕</div>
-                    <h1 className="text-2xl font-bold text-gray-800 mb-2">Page Not Found</h1>
-                    <p className="text-gray-600">{error || 'This feedback page is not available.'}</p>
+                    <div className="text-6xl mb-4">{errorType === 'network' ? '🌐' : errorType === 'server' ? '⚠️' : '😕'}</div>
+                    <h1 className="text-2xl font-bold text-gray-800 mb-2">
+                        {errorType === 'network' ? 'Connection Error' : errorType === 'server' ? 'Server Error' : 'Page Not Found'}
+                    </h1>
+                    <p className="text-gray-600 mb-4">{error || 'This feedback page is not available.'}</p>
+                    {errorType !== 'not_found' && (
+                        <button
+                            onClick={fetchBusiness}
+                            className="btn-primary inline-block"
+                        >
+                            🔄 Try Again
+                        </button>
+                    )}
                 </div>
             </div>
         )
@@ -116,7 +139,7 @@ export default function Feedback() {
                         <>
                             <div className="text-6xl mb-4">🎉</div>
                             <h1 className="text-2xl font-bold text-gray-800 mb-4">
-                                Thanks for your feedback!
+                                Thanks for your review!
                             </h1>
                             <p className="text-gray-600 mb-6">
                                 Would you like to leave a Google review?
@@ -143,6 +166,9 @@ export default function Feedback() {
                             </p>
                         </>
                     )}
+                    <p className="text-center text-xs text-gray-400 mt-6">
+                        Powered by <span className="font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">ReviewDock</span>
+                    </p>
                 </div>
             </div>
         )
@@ -221,7 +247,7 @@ export default function Feedback() {
                 </form>
 
                 <p className="text-center text-xs text-gray-400 mt-6">
-                    Your feedback is private and helps us improve
+                    Powered by <span className="font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">ReviewDock</span>
                 </p>
             </div>
         </div>

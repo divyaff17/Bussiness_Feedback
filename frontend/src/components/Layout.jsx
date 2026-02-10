@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import Plasma from './Plasma'
+import LightRays from './LightRays'
 
 // Inject layout animations
 const LAYOUT_KEYFRAMES_ID = 'layout-keyframes';
@@ -72,6 +72,15 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             0% { opacity: 0; transform: translateX(-20px); }
             100% { opacity: 1; transform: translateX(0); }
         }
+        @keyframes anchorSway {
+            0%, 100% { transform: rotate(-3deg); }
+            50% { transform: rotate(3deg); }
+        }
+        @keyframes dockWave {
+            0% { transform: translateX(-100%); opacity: 0; }
+            50% { opacity: 0.06; }
+            100% { transform: translateX(100%); opacity: 0; }
+        }
         .nav-item-hover:hover .nav-icon {
             animation: iconBounce 0.5s ease-in-out;
         }
@@ -121,15 +130,21 @@ export default function Layout({ children }) {
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* Plasma Background */}
+            {/* LightRays Background */}
             <div className="fixed inset-0 z-0">
-                <Plasma 
-                    color="#667eea"
-                    speed={0.6}
-                    direction="forward"
-                    scale={1.1}
-                    opacity={0.4}
-                    mouseInteractive={true}
+                <LightRays
+                    raysOrigin="top-center"
+                    raysColor="#ffffff"
+                    raysSpeed={1}
+                    lightSpread={0.5}
+                    rayLength={3}
+                    followMouse={true}
+                    mouseInfluence={0.1}
+                    noiseAmount={0}
+                    distortion={0}
+                    pulsating={false}
+                    fadeDistance={1}
+                    saturation={1}
                 />
             </div>
             
@@ -157,7 +172,18 @@ export default function Layout({ children }) {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative" style={{ overflow: 'visible', zIndex: 10 }}>
                     <div className="flex justify-between h-16" style={{ overflow: 'visible' }}>
                         {/* Logo */}
-                        <div className="flex items-center" style={{ position: 'relative', zIndex: 20 }}>
+                        <div className="flex items-center gap-2" style={{ position: 'relative', zIndex: 20 }}>
+                            {/* Anchor icon */}
+                            <span 
+                                className="text-2xl"
+                                style={{
+                                    filter: 'drop-shadow(0 0 8px rgba(102, 126, 234, 0.6))',
+                                    animation: 'logoGlow 2s ease-in-out infinite',
+                                    display: 'inline-block',
+                                }}
+                            >
+                                ⚓
+                            </span>
                             <span 
                                 className="text-2xl font-bold cursor-pointer relative"
                                 style={{
@@ -169,7 +195,7 @@ export default function Layout({ children }) {
                                     animation: 'logoShimmer 3s linear infinite, logoGlow 2s ease-in-out infinite',
                                 }}
                             >
-                                FeedbackPro
+                                ReviewDock
                             </span>
                         </div>
 
@@ -401,11 +427,80 @@ export default function Layout({ children }) {
             </nav>
 
             {/* Main Content */}
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24">
+            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
                 <div style={{ animation: 'fadeInUp 0.6s ease-out' }}>
                     {children}
                 </div>
             </main>
+
+            {/* Footer */}
+            <footer 
+                className="relative z-10 border-t overflow-hidden"
+                style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
+                    backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                }}
+            >
+                {/* Animated wave line across footer top */}
+                <div 
+                    className="absolute top-0 left-0 right-0 h-px"
+                    style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.6), rgba(118, 75, 162, 0.6), transparent)',
+                        backgroundSize: '200% 100%',
+                        animation: 'logoShimmer 4s linear infinite',
+                    }}
+                />
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                        {/* Brand */}
+                        <div className="flex flex-col items-center md:items-start gap-2">
+                            <div className="flex items-center gap-2">
+                                <span 
+                                    className="text-xl font-bold"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a5b4fc 100%)',
+                                        backgroundSize: '200% auto',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
+                                        animation: 'logoShimmer 3s linear infinite',
+                                    }}
+                                >
+                                    ⚓ ReviewDock
+                                </span>
+                            </div>
+                            <p className="text-white/40 text-sm text-center md:text-left">
+                                Smart review management for modern businesses
+                            </p>
+                        </div>
+
+                        {/* Links */}
+                        <div className="flex items-center gap-6 text-sm">
+                            <NavLink to="/dashboard" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                                Dashboard
+                            </NavLink>
+                            <NavLink to="/analytics" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                                Analytics
+                            </NavLink>
+                            <NavLink to="/pricing" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                                Pricing
+                            </NavLink>
+                        </div>
+
+                        {/* Copyright */}
+                        <div className="text-center md:text-right">
+                            <p className="text-white/30 text-xs">
+                                © {new Date().getFullYear()} ReviewDock. All rights reserved.
+                            </p>
+                            <p className="text-white/20 text-xs mt-1">
+                                Built with 💜 for businesses that care
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </footer>
         </div>
     )
 }

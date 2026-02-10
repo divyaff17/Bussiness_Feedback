@@ -1,9 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Load environment variables
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables from the backend directory
+dotenv.config({ path: join(__dirname, '.env') });
 
 // Import Supabase client (replaces SQLite)
 import './db/supabase.js';
@@ -18,12 +23,21 @@ import uploadRoutes from './routes/upload.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8081;
 
-// CORS configuration - strip any path from FRONTEND_URL
+// Trust proxy - required for Railway/Vercel reverse proxy (fixes X-Forwarded-For rate limiting)
+app.set('trust proxy', 1);
+
+// CORS configuration - allow both local dev and production origins
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8000').replace(/\/+$/, '').split('/').slice(0, 3).join('/');
+const allowedOrigins = [
+    frontendUrl,
+    'http://localhost:8000',
+    'https://bussiness-feedback-ap8e.vercel.app'
+].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
+
 app.use(cors({
-    origin: frontendUrl,
+    origin: allowedOrigins,
     credentials: true
 }));
 

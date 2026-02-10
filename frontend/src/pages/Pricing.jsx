@@ -1,5 +1,4 @@
 import Layout from '../components/Layout'
-import ElectricBorder from '../components/ElectricBorder'
 import { useAuth } from '../hooks/useAuth'
 import { useState, useEffect } from 'react'
 import API_URL from '../config/api'
@@ -99,7 +98,7 @@ export default function Pricing() {
 
     const handleUpgrade = (planId) => {
         // In production, this would integrate with Razorpay
-        alert(`Payment integration coming soon!\n\nFor now, contact us at support@feedback.com to upgrade to ${planId}.`)
+        alert(`Payment integration coming soon!\n\nFor now, contact us at support@reviewdock.com to upgrade to ${planId}.`)
     }
 
     // Different colors for each pricing card
@@ -125,9 +124,8 @@ export default function Pricing() {
 
                 {/* Current Usage */}
                 {!loading && currentPlan === 'free' && (
-                    <ElectricBorder color="#ec4899" speed={0.8} chaos={0.1} borderRadius={24} className="mb-8">
                     <div 
-                        className="p-6"
+                        className="p-6 mb-8"
                         style={{
                             ...glassCard,
                             background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
@@ -167,21 +165,13 @@ export default function Pricing() {
                             </div>
                         </div>
                     </div>
-                    </ElectricBorder>
                 )}
 
                 {/* Pricing Cards */}
                 <div className="grid md:grid-cols-3 gap-6" style={{ alignItems: 'stretch' }}>
                     {plans.map((plan, index) => (
-                        <ElectricBorder 
-                            key={plan.name}
-                            color={planColors[index]} 
-                            speed={0.8 + index * 0.2} 
-                            chaos={0.1 + index * 0.02} 
-                            borderRadius={24}
-                            style={{ height: '100%' }}
-                        >
                         <div
+                            key={plan.name}
                             onClick={() => setSelectedPlan(plan.planId)}
                             className="relative cursor-pointer transition-all duration-300 p-6 flex flex-col h-full"
                             style={{
@@ -279,13 +269,12 @@ export default function Pricing() {
                                 {plan.buttonText}
                             </button>
                         </div>
-                        </ElectricBorder>
                     ))}
                 </div>
 
                 {/* Trust badges */}
                 <div className="mt-12 text-center">
-                    <p className="text-sm text-white/40 mb-4">Trusted by 500+ businesses in India</p>
+                    <p className="text-sm text-white/40 mb-4">Trusted by 500+ businesses on ReviewDock</p>
                     <div className="flex justify-center items-center gap-6 text-white/50">
                         <span>🔒 Secure Payments</span>
                         <span>💳 Razorpay Protected</span>

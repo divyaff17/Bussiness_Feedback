@@ -1,5 +1,5 @@
 {
-    "name": "feedback-system-frontend",
+    "name": "reviewdock-frontend",
     "private": true,
     "version": "1.0.0",
     "type": "module",
@@ -15,6 +15,7 @@
         "date-fns": "^4.1.0",
         "meshline": "^3.3.1",
         "ogl": "^1.0.11",
+        "qr-code-styling": "^1.9.2",
         "react": "^18.2.0",
         "react-datepicker": "^9.1.0",
         "react-dom": "^18.2.0",

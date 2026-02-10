@@ -9,7 +9,7 @@ export default defineConfig({
         host: true, // Allow access from network (mobile devices)
         proxy: {
             '/api': {
-                target: 'http://localhost:8080',
+                target: 'http://localhost:8081',
                 changeOrigin: true
             }
         }

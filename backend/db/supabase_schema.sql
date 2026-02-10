@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     message TEXT,
     is_positive BOOLEAN NOT NULL DEFAULT FALSE,
     notified BOOLEAN DEFAULT FALSE,
+    ai_sentiment TEXT,           -- AI-detected sentiment: 'positive', 'negative', 'neutral'
+    ai_confidence INTEGER,       -- AI confidence score 0-100
+    sentiment_mismatch BOOLEAN DEFAULT FALSE,  -- true when stars don't match AI sentiment
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

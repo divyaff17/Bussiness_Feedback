@@ -316,7 +316,10 @@ router.get('/:id/platforms', authenticate, async (req, res) => {
         const { id } = req.params;
         const { businessId } = req.user;
 
+        console.log('[GET platforms] Requested id:', id, 'User businessId:', businessId);
+
         if (id !== businessId) {
+            console.log('[GET platforms] Auth mismatch - returning 403');
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -329,10 +332,11 @@ router.get('/:id/platforms', authenticate, async (req, res) => {
             .order('created_at', { ascending: true });
 
         if (error) {
-            console.error('Get platforms error:', error);
+            console.error('[GET platforms] Supabase error:', JSON.stringify(error));
             return res.status(500).json({ error: 'Failed to get platforms' });
         }
 
+        console.log('[GET platforms] Found', (platforms || []).length, 'platforms:', JSON.stringify(platforms));
         res.json({ platforms: platforms || [] });
     } catch (error) {
         console.error('Get platforms error:', error);
@@ -350,7 +354,10 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
         const { businessId } = req.user;
         const { url, isPrimary = false, customLabel } = req.body;
 
+        console.log('[POST platform] id:', id, 'businessId:', businessId, 'body:', JSON.stringify(req.body));
+
         if (id !== businessId) {
+            console.log('[POST platform] Auth mismatch - returning 403');
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -379,6 +386,7 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
             .single();
 
         if (existing) {
+            console.log('[POST platform] Duplicate URL found:', url);
             return res.status(400).json({ error: 'This URL is already added' });
         }
 
@@ -397,9 +405,11 @@ router.post('/:id/platforms', authenticate, async (req, res) => {
             .single();
 
         if (error) {
-            console.error('Add platform error:', error);
+            console.error('[POST platform] Insert error:', JSON.stringify(error));
             return res.status(500).json({ error: 'Failed to add platform' });
         }
+
+        console.log('[POST platform] Successfully inserted:', JSON.stringify(newPlatform));
 
         // Also update the legacy google_review_url if this is primary
         if (isPrimary) {
@@ -591,21 +601,24 @@ router.get('/:id/stats', authenticate, async (req, res) => {
         const now = new Date();
 
         if (filter === 'today') {
-            // Start of today (local time converted to UTC)
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            dateFilter = today.toISOString();
+            const today = now.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
+            dateFilter = today;
         } else if (filter === 'week') {
             const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             dateFilter = weekAgo.toISOString();
         } else if (filter === 'month') {
             const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             dateFilter = monthAgo.toISOString();
+        } else if (filter === 'year') {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            dateFilter = startOfYear.toISOString();
         }
+        // filter === 'all' or undefined → no dateFilter → fetch everything
 
-        // Build query
+        // Build query — fetch rating too for avgRating calculation
         let query = supabase
             .from('feedbacks')
-            .select('is_positive')
+            .select('rating, is_positive, sentiment_mismatch')
             .eq('business_id', id);
 
         if (dateFilter) {
@@ -621,8 +634,13 @@ router.get('/:id/stats', authenticate, async (req, res) => {
         const total = feedbacks?.length || 0;
         const positive = feedbacks?.filter(f => f.is_positive).length || 0;
         const negative = total - positive;
+        const mismatches = feedbacks?.filter(f => f.sentiment_mismatch).length || 0;
+        const avgRating = total > 0
+            ? parseFloat((feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / total).toFixed(1))
+            : 0;
+        const positiveRate = total > 0 ? Math.round((positive / total) * 100) : 0;
 
-        res.json({ total, positive, negative });
+        res.json({ total, positive, negative, mismatches, avgRating, positiveRate });
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).json({ error: 'Failed to get statistics' });

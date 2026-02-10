@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
-import ElectricBorder from '../components/ElectricBorder'
 import API_URL from '../config/api'
 
 // Glass card style helper
@@ -136,14 +135,35 @@ export default function Settings() {
             const data = await response.json()
             
             if (response.ok && data.valid) {
-                setNewPlatform(prev => ({
-                    ...prev,
-                    valid: true,
-                    message: `✓ ${data.platform.label} detected`,
-                    platform: data.platform.name,
-                    label: data.platform.label,
-                    validating: false
-                }))
+                // URL is valid — now automatically add it as a platform
+                const addResponse = await fetch(`${API_URL}/api/business/${user.businessId}/platforms`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        url: newPlatform.url,
+                        platformName: data.platform || 'custom',
+                        platformLabel: data.label || 'Custom',
+                        isPrimary: reviewPlatforms.length === 0
+                    })
+                })
+                
+                if (addResponse.ok) {
+                    await fetchPlatforms()
+                    setNewPlatform({ url: '', valid: null, validating: false, message: '', platform: '', label: '' })
+                    setPlatformSuccess(`✓ ${data.label || 'Platform'} added successfully!`)
+                    setTimeout(() => setPlatformSuccess(''), 3000)
+                } else {
+                    const addData = await addResponse.json()
+                    setNewPlatform(prev => ({
+                        ...prev,
+                        valid: false,
+                        message: addData.error || 'Failed to add platform',
+                        validating: false
+                    }))
+                }
             } else {
                 setNewPlatform(prev => ({
                     ...prev,
@@ -156,15 +176,15 @@ export default function Settings() {
             setNewPlatform(prev => ({
                 ...prev,
                 valid: false,
-                message: 'Validation failed',
+                message: 'Failed to add platform',
                 validating: false
             }))
         }
     }
 
-    // Add a new platform
+    // Add a new platform (kept for manual add if needed)
     const addPlatform = async () => {
-        if (!newPlatform.valid || !newPlatform.url) return
+        if (!newPlatform.url.trim()) return
         
         setSavingPlatforms(true)
         setPlatformSuccess('')
@@ -363,7 +383,6 @@ export default function Settings() {
                         ></div>
                     </div>
                 ) : (
-                    <ElectricBorder color="#14b8a6" speed={1} chaos={0.12} borderRadius={24}>
                     <div className="p-6" style={glassCard}>
                         {/* Profile Picture Section */}
                         <div 
@@ -623,42 +642,25 @@ export default function Settings() {
                                             placeholder="Paste review link (Google, Yelp, TripAdvisor...)"
                                         />
                                         {newPlatform.message && (
-                                            <p className={`text-xs mt-1 ${newPlatform.valid ? 'text-green-400' : 'text-red-400'}`}>
+                                            <p className={`text-xs mt-1 ${newPlatform.valid !== false ? 'text-green-400' : 'text-red-400'}`}>
                                                 {newPlatform.message}
                                             </p>
                                         )}
                                     </div>
-                                    {!newPlatform.valid && (
-                                        <button
-                                            type="button"
-                                            onClick={validatePlatformUrl}
-                                            disabled={!newPlatform.url.trim() || newPlatform.validating}
-                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                            style={{
-                                                background: 'rgba(102, 126, 234, 0.2)',
-                                                border: '1px solid rgba(102, 126, 234, 0.4)',
-                                                color: '#a5b4fc',
-                                                opacity: (!newPlatform.url.trim() || newPlatform.validating) ? 0.5 : 1
-                                            }}
-                                        >
-                                            {newPlatform.validating ? '...' : 'Check'}
-                                        </button>
-                                    )}
-                                    {newPlatform.valid && (
-                                        <button
-                                            type="button"
-                                            onClick={addPlatform}
-                                            disabled={savingPlatforms}
-                                            className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                                            style={{
-                                                background: 'rgba(34, 197, 94, 0.2)',
-                                                border: '1px solid rgba(34, 197, 94, 0.4)',
-                                                color: '#4ade80'
-                                            }}
-                                        >
-                                            {savingPlatforms ? '...' : '+ Add'}
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={validatePlatformUrl}
+                                        disabled={!newPlatform.url.trim() || newPlatform.validating}
+                                        className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                                        style={{
+                                            background: 'rgba(34, 197, 94, 0.2)',
+                                            border: '1px solid rgba(34, 197, 94, 0.4)',
+                                            color: '#4ade80',
+                                            opacity: (!newPlatform.url.trim() || newPlatform.validating) ? 0.5 : 1
+                                        }}
+                                    >
+                                        {newPlatform.validating ? '...' : '+ Add'}
+                                    </button>
                                 </div>
 
                                 {platformSuccess && (
@@ -805,7 +807,6 @@ export default function Settings() {
                             </div>
                         </div>
                     </div>
-                    </ElectricBorder>
                 )}
             </div>
         </Layout>
