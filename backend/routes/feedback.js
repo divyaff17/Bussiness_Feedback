@@ -447,16 +447,18 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        if (!reply || reply.trim().length === 0) {
+        if (!reply && reply !== '') {
             return res.status(400).json({ error: 'Reply text is required' });
         }
 
+        // If reply is empty string, it means "hide/remove reply"
+        const updateData = reply.trim() 
+            ? { owner_reply: reply.trim(), replied_at: new Date().toISOString() }
+            : { owner_reply: null, replied_at: null };
+
         const { data, error } = await supabase
             .from('feedbacks')
-            .update({ 
-                owner_reply: reply.trim(), 
-                replied_at: new Date().toISOString() 
-            })
+            .update(updateData)
             .eq('id', feedbackId)
             .eq('business_id', businessId)
             .select()
@@ -467,9 +469,9 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
             return res.status(500).json({ error: 'Failed to save reply' });
         }
 
-        // Send reply email to customer if they provided an email
+        // Send reply email to customer if they provided an email (only for actual replies, not deletions)
         let emailSent = false;
-        if (data?.customer_email) {
+        if (data?.customer_email && reply.trim()) {
             try {
                 // Get business name for the email
                 const { data: biz } = await supabase

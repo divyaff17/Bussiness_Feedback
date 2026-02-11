@@ -905,6 +905,7 @@ export default function Dashboard() {
                                             {/* Reply Actions */}
                                             <div className="mt-2 flex gap-2">
                                                 {replyingTo !== feedback.id ? (
+                                                    <>
                                                     <button
                                                         onClick={() => {
                                                             setReplyingTo(feedback.id)
@@ -920,6 +921,31 @@ export default function Dashboard() {
                                                         {feedback.owner_reply ? '✏️ Edit Reply' : '💬 Reply'}
                                                         {feedback.has_email && <span title="Reply will be emailed to customer" className="ml-1">📧</span>}
                                                     </button>
+                                                    {feedback.owner_reply && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!confirm('Remove this reply?')) return
+                                                                try {
+                                                                    const token = getToken()
+                                                                    const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/${feedback.id}/reply`, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                                                        body: JSON.stringify({ reply: '' })
+                                                                    })
+                                                                    if (res.ok) fetchData(false)
+                                                                } catch (err) { console.error(err) }
+                                                            }}
+                                                            className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                                                            style={{
+                                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                                border: '1px solid rgba(239, 68, 68, 0.25)',
+                                                                color: '#f87171',
+                                                            }}
+                                                        >
+                                                            🚫 Hide Reply
+                                                        </button>
+                                                    )}
+                                                    </>
                                                 ) : (
                                                     <div className="flex-1">
                                                         <textarea
