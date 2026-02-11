@@ -252,9 +252,13 @@ export default function Dashboard() {
                 if (data.emailSent) {
                     alert('✅ Reply saved & emailed to customer!')
                 }
+            } else {
+                const errData = await res.json().catch(() => ({}))
+                alert(`Failed to send reply: ${errData.error || res.statusText}`)
             }
         } catch (err) {
             console.error('Reply error:', err)
+            alert('Failed to send reply. Please try again.')
         } finally {
             setReplySending(false)
         }
@@ -918,20 +922,6 @@ export default function Dashboard() {
                                                     </button>
                                                 ) : (
                                                     <div className="flex-1">
-                                                        <div className="flex gap-2 mb-2">
-                                                            <button
-                                                                onClick={() => setReplyText(generateReplyTemplate(feedback))}
-                                                                className="text-xs px-2 py-1 rounded-lg transition-all"
-                                                                style={{
-                                                                    background: 'rgba(139, 92, 246, 0.15)',
-                                                                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                                                                    color: '#c4b5fd',
-                                                                }}
-                                                                title="Generate AI reply suggestion"
-                                                            >
-                                                                🤖 AI Suggest
-                                                            </button>
-                                                        </div>
                                                         <textarea
                                                             value={replyText}
                                                             onChange={(e) => setReplyText(e.target.value)}

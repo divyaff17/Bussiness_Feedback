@@ -625,10 +625,10 @@ router.get('/:id/stats', authenticate, async (req, res) => {
             prevDateFilter = { start: startOfLastYear.toISOString(), end: startOfYear.toISOString() };
         }
 
-        // Build query — fetch rating, is_positive, reply info
+        // Build query — fetch all fields (use * to be resilient to missing columns)
         let query = supabase
             .from('feedbacks')
-            .select('rating, is_positive, owner_reply, replied_at, created_at')
+            .select('*')
             .eq('business_id', id);
 
         if (dateFilter) {
