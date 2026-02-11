@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
@@ -158,7 +158,7 @@ export default function Layout({ children }) {
     const profileDropdownRef = useRef(null)
     const [newFeedbackCount, setNewFeedbackCount] = useState(0)
 
-    // Fetch new feedback count (last 24h unreplied)
+    // Fetch new feedback count (last 24h unreplied) — poll every 60s, pause when tab hidden
     useEffect(() => {
         const fetchNewCount = async () => {
             try {
@@ -174,8 +174,26 @@ export default function Layout({ children }) {
             } catch (err) { /* silent */ }
         }
         fetchNewCount()
-        const interval = setInterval(fetchNewCount, 30000) // every 30s
-        return () => clearInterval(interval)
+
+        let interval = null
+        const startPolling = () => {
+            if (interval) clearInterval(interval)
+            interval = setInterval(fetchNewCount, 60000)
+        }
+        const stopPolling = () => {
+            if (interval) { clearInterval(interval); interval = null }
+        }
+        const handleVisibility = () => {
+            if (document.hidden) { stopPolling() }
+            else { fetchNewCount(); startPolling() }
+        }
+
+        startPolling()
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => {
+            stopPolling()
+            document.removeEventListener('visibilitychange', handleVisibility)
+        }
     }, [user?.businessId])
 
     // Close dropdown when clicking outside
@@ -201,13 +219,13 @@ export default function Layout({ children }) {
         return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#667eea" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
     }
 
-    const navItems = [
+    const navItems = useMemo(() => [
         { path: '/dashboard', label: 'Dashboard', icon: '📊', badge: newFeedbackCount },
         { path: '/analytics', label: 'Analytics', icon: '📈' },
         { path: '/qr-code', label: 'QR Code', icon: '📱' },
         { path: '/pricing', label: 'Pricing', icon: '💎' },
         { path: '/settings', label: 'Settings', icon: '⚙️' },
-    ]
+    ], [newFeedbackCount])
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
@@ -216,11 +234,11 @@ export default function Layout({ children }) {
                 <LightRays
                     raysOrigin="top-center"
                     raysColor="#ffffff"
-                    raysSpeed={1}
+                    raysSpeed={0.5}
                     lightSpread={0.5}
                     rayLength={3}
-                    followMouse={true}
-                    mouseInfluence={0.1}
+                    followMouse={false}
+                    mouseInfluence={0}
                     noiseAmount={0}
                     distortion={0}
                     pulsating={false}
@@ -252,7 +270,7 @@ export default function Layout({ children }) {
                     className="absolute top-0 h-full w-1/3 pointer-events-none"
                     style={{
                         background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent)',
-                        animation: 'navbarShine 4s ease-in-out infinite',
+                        animation: 'navbarShine 8s ease-in-out infinite',
                         zIndex: 0,
                     }}
                 />
@@ -272,7 +290,7 @@ export default function Layout({ children }) {
                                 className="text-2xl"
                                 style={{
                                     filter: 'drop-shadow(0 0 8px rgba(102, 126, 234, 0.6))',
-                                    animation: 'anchorSpin 4s linear infinite',
+                                    animation: 'anchorSpin 12s linear infinite',
                                     display: 'inline-block',
                                 }}
                             >
@@ -371,7 +389,7 @@ export default function Layout({ children }) {
                                         style={{
                                             border: '2px solid rgba(102, 126, 234, 0.5)',
                                             boxShadow: '0 0 10px rgba(102, 126, 234, 0.3)',
-                                            animation: 'profileRing 2s ease-in-out infinite',
+                                            animation: 'profileRing 4s ease-in-out infinite',
                                         }}
                                         onError={(e) => {
                                             e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
@@ -591,7 +609,7 @@ export default function Layout({ children }) {
                                 <span
                                     style={{
                                         display: 'inline-block',
-                                        animation: 'anchorSpin 4s linear infinite',
+                                        animation: 'anchorSpin 12s linear infinite',
                                         fontSize: '1.35rem',
                                     }}
                                 >

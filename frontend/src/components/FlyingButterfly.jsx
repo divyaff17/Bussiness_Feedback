@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 const BUTTERFLY_COLORS = [
     { wing1: '#667eea', wing2: '#764ba2', body: '#a5b4fc', accent: '#c084fc' },
@@ -8,84 +8,92 @@ const BUTTERFLY_COLORS = [
 ]
 
 function Butterfly({ id, colorSet, delay }) {
-    const [pos, setPos] = useState({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 })
-    const [target, setTarget] = useState({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 })
-    const [rotation, setRotation] = useState(0)
-    const [opacity, setOpacity] = useState(0)
-    const animRef = useRef(null)
+    const elRef = useRef(null)
+    const posRef = useRef({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 })
+    const targetRef = useRef({ x: Math.random() * 80 + 10, y: Math.random() * 80 + 10 })
     const timeRef = useRef(0)
+    const animRef = useRef(null)
 
     const pickNewTarget = useCallback(() => {
-        setTarget({
+        targetRef.current = {
             x: Math.random() * 85 + 5,
             y: Math.random() * 75 + 10,
-        })
+        }
     }, [])
 
-    // Fade in with delay
+    // Animation loop with 30fps cap, direct DOM updates (no React re-renders)
     useEffect(() => {
-        const t = setTimeout(() => setOpacity(1), delay)
-        return () => clearTimeout(t)
-    }, [delay])
+        const fadeTimer = setTimeout(() => {
+            if (elRef.current) elRef.current.style.opacity = '1'
+        }, delay)
 
-    // Flight animation loop
-    useEffect(() => {
         let lastTime = performance.now()
+        let lastFrameTime = 0
+        const frameDuration = 1000 / 30
 
         const animate = (now) => {
+            if (now - lastFrameTime < frameDuration) {
+                animRef.current = requestAnimationFrame(animate)
+                return
+            }
+            lastFrameTime = now
+
             const dt = (now - lastTime) / 1000
             lastTime = now
             timeRef.current += dt
 
-                setPos(prev => {
-                    const dx = target.x - prev.x
-                    const dy = target.y - prev.y
-                    const dist = Math.sqrt(dx * dx + dy * dy)
+            const pos = posRef.current
+            const target = targetRef.current
+            const dx = target.x - pos.x
+            const dy = target.y - pos.y
+            const dist = Math.sqrt(dx * dx + dy * dy)
 
-                    // Calculate rotation based on movement direction
-                    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
-                    setRotation(angle)
+            if (dist < 2) {
+                pickNewTarget()
+            } else {
+                const speed = 8 + Math.sin(timeRef.current * 2) * 3
+                const wobble = Math.sin(timeRef.current * 5) * 0.8
+                const moveX = (dx / dist) * speed * dt + wobble * dt * (dy / dist)
+                const moveY = (dy / dist) * speed * dt - wobble * dt * (dx / dist)
 
-                    if (dist < 2) {
-                        pickNewTarget()
-                        return prev
-                    }
+                pos.x = Math.max(2, Math.min(95, pos.x + moveX))
+                pos.y = Math.max(2, Math.min(90, pos.y + moveY))
+            }
 
-                    // Smooth curved flight with sine wave
-                    const speed = 8 + Math.sin(timeRef.current * 2) * 3
-                    const wobble = Math.sin(timeRef.current * 5) * 0.8
-                    const moveX = (dx / dist) * speed * dt + wobble * dt * (dy / dist)
-                    const moveY = (dy / dist) * speed * dt - wobble * dt * (dx / dist)
+            const angle = Math.atan2(dy, dx) * (180 / Math.PI)
 
-                    return {
-                        x: Math.max(2, Math.min(95, prev.x + moveX)),
-                        y: Math.max(2, Math.min(90, prev.y + moveY)),
-                    }
-                })
+            // Direct DOM update — no React state, no re-render
+            if (elRef.current) {
+                elRef.current.style.left = `${pos.x}%`
+                elRef.current.style.top = `${pos.y}%`
+                elRef.current.style.transform = `rotate(${angle * 0.3}deg)`
+            }
 
             animRef.current = requestAnimationFrame(animate)
         }
 
         animRef.current = requestAnimationFrame(animate)
         return () => {
+            clearTimeout(fadeTimer)
             cancelAnimationFrame(animRef.current)
         }
-    }, [target, pickNewTarget])
+    }, [delay, pickNewTarget])
 
     const wingFlap = `wingFlap 0.15s ease-in-out infinite alternate`
     const bobbing = `butterflyBob 1.2s ease-in-out infinite`
 
     return (
         <div
+            ref={elRef}
             style={{
                 position: 'fixed',
-                left: `${pos.x}%`,
-                top: `${pos.y}%`,
+                left: `${posRef.current.x}%`,
+                top: `${posRef.current.y}%`,
                 zIndex: 45,
                 pointerEvents: 'none',
-                transition: 'none',
-                transform: `rotate(${rotation * 0.3}deg)`,
-                opacity,
+                transition: 'opacity 0.5s ease',
+                transform: `rotate(0deg)`,
+                opacity: 0,
                 filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))',
                 willChange: 'left, top, transform',
             }}

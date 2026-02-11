@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
 import API_URL from '../config/api'
@@ -95,15 +95,31 @@ export default function Dashboard() {
         markAlertsRead()
     }, [user?.businessId])
 
-    // Initial fetch and auto-refresh every 5 seconds for real-time updates
+    // Initial fetch and auto-refresh every 30 seconds (pauses when tab not visible)
     useEffect(() => {
         fetchData()
 
-        const interval = setInterval(() => {
-            fetchData(false) // false = don't show loading spinner on refresh
-        }, 5000)
+        let interval = null
+        const startPolling = () => {
+            if (interval) clearInterval(interval)
+            interval = setInterval(() => {
+                fetchData(false)
+            }, 30000)
+        }
+        const stopPolling = () => {
+            if (interval) { clearInterval(interval); interval = null }
+        }
+        const handleVisibility = () => {
+            if (document.hidden) { stopPolling() }
+            else { fetchData(false); startPolling() }
+        }
 
-        return () => clearInterval(interval)
+        startPolling()
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => {
+            stopPolling()
+            document.removeEventListener('visibilitychange', handleVisibility)
+        }
     }, [filter, feedbackType])
 
     const fetchData = async (showLoading = true) => {
@@ -145,13 +161,13 @@ export default function Dashboard() {
         }
     }
 
-    const filterOptions = [
+    const filterOptions = useMemo(() => [
         { value: 'all', label: 'All Time' },
         { value: 'today', label: 'Today' },
         { value: 'week', label: 'Last 7 Days' },
         { value: 'month', label: 'Last 30 Days' },
         { value: 'year', label: 'This Year' }
-    ]
+    ], [])
 
     // Fetch AI summary
     const fetchAiSummary = async () => {
@@ -358,23 +374,25 @@ export default function Dashboard() {
         }
     }
 
-    // Filtered feedbacks by search, pinned first
-    const filteredFeedbacks = feedbacks.filter(fb => {
-        if (!searchQuery.trim()) return true
-        const q = searchQuery.toLowerCase()
-        return (fb.message || '').toLowerCase().includes(q) ||
-               (fb.owner_reply || '').toLowerCase().includes(q) ||
-               (fb.ai_sentiment || '').toLowerCase().includes(q)
-    }).sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
+    // Filtered feedbacks by search, pinned first (memoized)
+    const filteredFeedbacks = useMemo(() => {
+        return feedbacks.filter(fb => {
+            if (!searchQuery.trim()) return true
+            const q = searchQuery.toLowerCase()
+            return (fb.message || '').toLowerCase().includes(q) ||
+                   (fb.owner_reply || '').toLowerCase().includes(q) ||
+                   (fb.ai_sentiment || '').toLowerCase().includes(q)
+        }).sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
+    }, [feedbacks, searchQuery])
 
-    const formatTime = (dateString) => {
+    const formatTime = useCallback((dateString) => {
         if (!dateString) return 'Unknown time'
         const date = new Date(dateString)
         if (isNaN(date.getTime())) return 'Invalid time'
         return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
-    }
+    }, [])
 
-    const formatDate = (dateString) => {
+    const formatDate = useCallback((dateString) => {
         if (!dateString) return 'Unknown date'
         const date = new Date(dateString)
         if (isNaN(date.getTime())) return 'Invalid date'
@@ -391,9 +409,9 @@ export default function Dashboard() {
         } else {
             return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
         }
-    }
+    }, [])
 
-    const getFilterLabel = () => {
+    const getFilterLabel = useCallback(() => {
         switch (filter) {
             case 'all': return '(all time)'
             case 'today': return 'today'
@@ -402,13 +420,13 @@ export default function Dashboard() {
             case 'year': return 'this year'
             default: return ''
         }
-    }
+    }, [filter])
 
     // Generate default avatar with initials
-    const getDefaultAvatar = (name) => {
+    const getDefaultAvatar = useCallback((name) => {
         const initial = (name || 'U').charAt(0).toUpperCase()
         return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#667eea" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
-    }
+    }, [])
 
     return (
         <Layout>
@@ -481,7 +499,7 @@ export default function Dashboard() {
                         <p className="text-white/60">View feedback for your business</p>
                         <p className="text-xs text-green-400 flex items-center gap-1 mt-1">
                             <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                            Real-time updates every 5s • Last: {lastUpdated.toLocaleTimeString()}
+                            Real-time updates • Last: {lastUpdated.toLocaleTimeString()}
                         </p>
                     </div>
 
