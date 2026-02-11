@@ -33,6 +33,9 @@ export default function Dashboard() {
     // Delete state
     const [deletingId, setDeletingId] = useState(null)
 
+    // Track which replies are collapsed
+    const [hiddenReplies, setHiddenReplies] = useState(new Set())
+
     // Export state
     const [exporting, setExporting] = useState(false)
 
@@ -883,7 +886,7 @@ export default function Dashboard() {
                                             </div>
 
                                             {/* Owner Reply Display */}
-                                            {feedback.owner_reply && replyingTo !== feedback.id && (
+                                            {feedback.owner_reply && replyingTo !== feedback.id && !hiddenReplies.has(feedback.id) && (
                                                 <div 
                                                     className="mt-3 p-3 rounded-lg ml-4"
                                                     style={{
@@ -923,26 +926,25 @@ export default function Dashboard() {
                                                     </button>
                                                     {feedback.owner_reply && (
                                                         <button
-                                                            onClick={async () => {
-                                                                if (!confirm('Remove this reply?')) return
-                                                                try {
-                                                                    const token = getToken()
-                                                                    const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/${feedback.id}/reply`, {
-                                                                        method: 'POST',
-                                                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                                                                        body: JSON.stringify({ reply: '' })
-                                                                    })
-                                                                    if (res.ok) fetchData(false)
-                                                                } catch (err) { console.error(err) }
+                                                            onClick={() => {
+                                                                setHiddenReplies(prev => {
+                                                                    const next = new Set(prev)
+                                                                    if (next.has(feedback.id)) {
+                                                                        next.delete(feedback.id)
+                                                                    } else {
+                                                                        next.add(feedback.id)
+                                                                    }
+                                                                    return next
+                                                                })
                                                             }}
                                                             className="text-xs px-3 py-1.5 rounded-lg transition-all"
                                                             style={{
-                                                                background: 'rgba(239, 68, 68, 0.1)',
-                                                                border: '1px solid rgba(239, 68, 68, 0.25)',
-                                                                color: '#f87171',
+                                                                background: hiddenReplies.has(feedback.id) ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.06)',
+                                                                border: `1px solid ${hiddenReplies.has(feedback.id) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                                                                color: hiddenReplies.has(feedback.id) ? '#93c5fd' : 'rgba(255, 255, 255, 0.5)',
                                                             }}
                                                         >
-                                                            🚫 Hide Reply
+                                                            {hiddenReplies.has(feedback.id) ? '👁️ Show Reply' : '🚫 Hide Reply'}
                                                         </button>
                                                     )}
                                                     </>
