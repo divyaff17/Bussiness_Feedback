@@ -22,55 +22,74 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true)
     const [lastUpdated, setLastUpdated] = useState(new Date())
 
+    // Search
+    const [searchQuery, setSearchQuery] = useState('')
+
+    // Reply state
+    const [replyingTo, setReplyingTo] = useState(null)
+    const [replyText, setReplyText] = useState('')
+    const [replySending, setReplySending] = useState(false)
+
+    // Delete state
+    const [deletingId, setDeletingId] = useState(null)
+
+    // Export state
+    const [exporting, setExporting] = useState(false)
+
     // AI Summary state
     const [aiSummary, setAiSummary] = useState(null)
     const [aiLoading, setAiLoading] = useState(false)
 
-    // External feedback state
-    const [externalText, setExternalText] = useState('')
-    const [externalSource, setExternalSource] = useState('Google Form')
-    const [externalSubmitting, setExternalSubmitting] = useState(false)
-    const [externalSuccess, setExternalSuccess] = useState('')
+    // Saved external summaries from Settings
+    const [savedSummaries, setSavedSummaries] = useState([])
+    const [selectedSummary, setSelectedSummary] = useState(null)
+    const [summaryAnalysis, setSummaryAnalysis] = useState(null)
+    const [summaryAnalyzing, setSummaryAnalyzing] = useState(false)
+    const [summaryError, setSummaryError] = useState('')
 
-    // Saved review platforms from Settings
-    const [savedPlatforms, setSavedPlatforms] = useState([])
-    const [selectedPlatform, setSelectedPlatform] = useState(null)
-    const [showManualInput, setShowManualInput] = useState(false)
-
-    // URL analysis state
-    const [urlAnalysis, setUrlAnalysis] = useState(null)
-    const [urlAnalyzing, setUrlAnalyzing] = useState(false)
-    const [urlError, setUrlError] = useState('')
-
-    // Quick URL input (paste any review link)
-    const [quickUrl, setQuickUrl] = useState('')
-
-    // Platform icons mapping
-    const platformIcons = {
-        google: '�', google_maps: '📍', yelp: '⭐', tripadvisor: '🦉', facebook: '📘',
-        trustpilot: '⭐', google_forms: '📋', surveymonkey: '🐵',
-        typeform: '📝', zomato: '🍽️', swiggy: '🍔', amazon: '📦',
-        booking: '🏨', airbnb: '🏠', jotform: '📝', custom: '🔗'
-    }
-
-    // Fetch saved review platforms from settings
+    // Fetch saved external summaries from settings
     useEffect(() => {
-        const fetchPlatforms = async () => {
+        const fetchSummaries = async () => {
             try {
                 const token = getToken()
                 if (!token || !user?.businessId) return
-                const res = await fetch(`${API_URL}/api/business/${user.businessId}/platforms`, {
+                const res = await fetch(`${API_URL}/api/business/${user.businessId}/external-summaries`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
                 if (res.ok) {
                     const data = await res.json()
-                    setSavedPlatforms(data.platforms || [])
+                    setSavedSummaries(data.summaries || [])
                 }
             } catch (err) {
-                console.error('Failed to fetch platforms:', err)
+                console.error('Failed to fetch summaries:', err)
             }
         }
-        fetchPlatforms()
+        fetchSummaries()
+    }, [user?.businessId])
+
+    // Mark alerts as notified when user visits Dashboard (clears nav badge)
+    useEffect(() => {
+        const markAlertsRead = async () => {
+            try {
+                const token = getToken()
+                if (!token || !user?.businessId) return
+                const headers = { 'Authorization': `Bearer ${token}` }
+                // Get unread alert IDs
+                const alertRes = await fetch(`${API_URL}/api/business/${user.businessId}/alerts`, { headers })
+                if (alertRes.ok) {
+                    const alertData = await alertRes.json()
+                    if (alertData.newNegative?.length > 0) {
+                        const feedbackIds = alertData.newNegative.map(f => f.id)
+                        await fetch(`${API_URL}/api/business/${user.businessId}/alerts/mark-notified`, {
+                            method: 'POST',
+                            headers: { ...headers, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ feedbackIds })
+                        })
+                    }
+                }
+            } catch (err) { /* silent */ }
+        }
+        markAlertsRead()
     }, [user?.businessId])
 
     // Initial fetch and auto-refresh every 5 seconds for real-time updates
@@ -150,172 +169,196 @@ export default function Dashboard() {
         }
     }
 
-    // Submit external feedback for AI analysis
-    const submitExternalFeedback = async () => {
-        if (!externalText.trim()) return
-        setExternalSubmitting(true)
-        setExternalSuccess('')
+    // Analyze a saved external summary from Settings
+    const analyzeSavedSummary = async (summary) => {
+        setSelectedSummary(summary)
+        setSummaryAnalysis(null)
+        setSummaryError('')
+        setSummaryAnalyzing(true)
+
         try {
             const token = getToken()
-            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/external`, {
+            const res = await fetch(`${API_URL}/api/business/${user.businessId}/external-summaries/${summary.id}/analyze`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ text: externalText.trim(), source: externalSource })
+                }
+            })
+            const data = await res.json()
+            if (res.ok) {
+                setSummaryAnalysis(data.analysis)
+                // Refresh summaries list to show updated status
+                const listRes = await fetch(`${API_URL}/api/business/${user.businessId}/external-summaries`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (listRes.ok) {
+                    const listData = await listRes.json()
+                    setSavedSummaries(listData.summaries || [])
+                }
+                fetchData(false) // Refresh dashboard data since feedbacks were added
+            } else {
+                setSummaryError(data.error || 'Failed to analyze summary')
+            }
+        } catch (error) {
+            console.error('Summary analysis error:', error)
+            setSummaryError('Failed to connect to server')
+        } finally {
+            setSummaryAnalyzing(false)
+        }
+    }
+
+    // View a previously analyzed summary
+    const viewSummaryAnalysis = async (summary) => {
+        setSelectedSummary(summary)
+        setSummaryAnalysis(null)
+        setSummaryError('')
+
+        try {
+            const token = getToken()
+            const res = await fetch(`${API_URL}/api/business/${user.businessId}/external-summaries/${summary.id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             })
             if (res.ok) {
                 const data = await res.json()
-                setExternalText('')
-                setExternalSuccess(`Analyzed as ${data.feedback.analysis.sentiment} (${data.feedback.analysis.confidence}% confidence) — Rating: ${data.feedback.analysis.rating}/5`)
-                setTimeout(() => setExternalSuccess(''), 5000)
-                fetchData(false) // Refresh feed
+                if (data.summary?.analysis_result) {
+                    setSummaryAnalysis(data.summary.analysis_result)
+                } else {
+                    setSummaryError('No analysis data found. Click "Analyze" to run analysis.')
+                }
             }
         } catch (error) {
-            console.error('External feedback error:', error)
-        } finally {
-            setExternalSubmitting(false)
+            console.error('View analysis error:', error)
+            setSummaryError('Failed to load analysis')
         }
     }
 
-    // Check if a URL is a protected platform that can't be scraped
-    const isProtectedPlatform = (url) => {
-        if (!url) return false
-        const protectedPatterns = [
-            /docs\.google\.com\/forms/i,
-            /forms\.gle/i,
-        ]
-        return protectedPatterns.some(p => p.test(url))
-    }
-
-    // Check if URL is a Google Maps business link
-    const isGoogleMapsUrl = (url) => {
-        if (!url) return false
-        const l = url.toLowerCase()
-        return l.includes('google.com/maps') || l.includes('maps.google.com') ||
-               l.includes('g.page') || l.includes('goo.gl/maps') ||
-               l.includes('search.google.com/local')
-    }
-
-    // Analyze a quick-pasted URL (no need to save in Settings)
-    const analyzeQuickUrl = async () => {
-        if (!quickUrl.trim()) return
-        const url = quickUrl.trim()
-
-        // Detect platform label
-        let platformLabel = 'Review Page'
-        if (isGoogleMapsUrl(url)) platformLabel = 'Google Maps'
-        else if (url.includes('yelp.com')) platformLabel = 'Yelp'
-        else if (url.includes('tripadvisor')) platformLabel = 'TripAdvisor'
-        else if (url.includes('trustpilot')) platformLabel = 'Trustpilot'
-        else if (url.includes('facebook.com')) platformLabel = 'Facebook'
-        else if (url.includes('zomato.com')) platformLabel = 'Zomato'
-        else if (url.includes('swiggy.com')) platformLabel = 'Swiggy'
-        else if (url.includes('amazon.')) platformLabel = 'Amazon'
-
-        const fakePlatform = { id: 'quick', url, platform_label: platformLabel, platform_name: platformLabel.toLowerCase().replace(/\s/g, '_') }
-        setSelectedPlatform(fakePlatform)
-        setUrlAnalysis(null)
-        setUrlError('')
-        setShowManualInput(false)
-
-        // Google Forms — can't scrape
-        if (isProtectedPlatform(url)) {
-            setShowManualInput(true)
-            setExternalSource('Google Form')
-            setUrlError('google_forms_guide')
-            return
-        }
-
-        // Google Maps — try to scrape, but reviews are mostly JS-rendered
-        // so also offer manual paste option
-        if (isGoogleMapsUrl(url)) {
-            setShowManualInput(true)
-            setExternalSource('Google Maps')
-            setUrlError('google_maps_guide')
-            return
-        }
-
-        // Other URLs — try direct scrape via backend
-        setUrlAnalyzing(true)
+    // Reply to feedback
+    const replyToFeedback = async (feedbackId) => {
+        if (!replyText.trim()) return
+        setReplySending(true)
         try {
             const token = getToken()
-            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/analyze-url`, {
+            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/${feedbackId}/reply`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ url, platformLabel, platformName: fakePlatform.platform_name })
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ reply: replyText.trim() })
             })
-            const data = await res.json()
             if (res.ok) {
-                setUrlAnalysis(data)
+                const data = await res.json()
+                setReplyingTo(null)
+                setReplyText('')
                 fetchData(false)
-            } else {
-                setUrlError(data.error || 'Failed to analyze URL')
+                if (data.emailSent) {
+                    alert('✅ Reply saved & emailed to customer!')
+                }
             }
-        } catch (error) {
-            console.error('URL analysis error:', error)
-            setUrlError('Failed to connect to server')
+        } catch (err) {
+            console.error('Reply error:', err)
         } finally {
-            setUrlAnalyzing(false)
+            setReplySending(false)
         }
     }
 
-    // One-click analyze a platform URL
-    const analyzeUrl = async (platform) => {
-        setSelectedPlatform(platform)
-        setUrlAnalysis(null)
-        setUrlError('')
-        setShowManualInput(false)
-
-        // Google Forms & similar: can't scrape, show manual paste with export guide
-        if (isProtectedPlatform(platform.url)) {
-            setShowManualInput(true)
-            setExternalSource(platform.platform_label || 'Google Form')
-            setUrlError('google_forms_guide')
-            return
-        }
-
-        // Google Maps: reviews are JS-rendered, show paste guide
-        if (isGoogleMapsUrl(platform.url)) {
-            setShowManualInput(true)
-            setExternalSource('Google Maps')
-            setUrlError('google_maps_guide')
-            return
-        }
-
-        setUrlAnalyzing(true)
+    // Delete feedback
+    const deleteFeedback = async (feedbackId) => {
+        if (!confirm('Delete this feedback permanently?')) return
+        setDeletingId(feedbackId)
         try {
             const token = getToken()
-            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/analyze-url`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    url: platform.url,
-                    platformLabel: platform.platform_label,
-                    platformName: platform.platform_name
-                })
+            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/${feedbackId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
             })
-            const data = await res.json()
-            if (res.ok) {
-                setUrlAnalysis(data)
-                fetchData(false) // Refresh dashboard data
-            } else {
-                setUrlError(data.error || 'Failed to analyze URL')
-            }
-        } catch (error) {
-            console.error('URL analysis error:', error)
-            setUrlError('Failed to connect to server')
+            if (res.ok) fetchData(false)
+        } catch (err) {
+            console.error('Delete error:', err)
         } finally {
-            setUrlAnalyzing(false)
+            setDeletingId(null)
         }
     }
+
+    // Pin/bookmark feedback
+    const pinFeedback = async (feedbackId) => {
+        try {
+            const token = getToken()
+            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/${feedbackId}/pin`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (res.ok) fetchData(false)
+        } catch (err) {
+            console.error('Pin error:', err)
+        }
+    }
+
+    // Export CSV
+    const exportCSV = async () => {
+        setExporting(true)
+        try {
+            const token = getToken()
+            if (!token) {
+                alert('Please log in again to export')
+                setExporting(false)
+                return
+            }
+            const typeParam = feedbackType === 'all' ? '' : `&type=${feedbackType}`
+            const res = await fetch(`${API_URL}/api/feedback/${user.businessId}/export?filter=${filter}${typeParam}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                alert(errData.error || `Export failed (${res.status})`)
+                return
+            }
+            const csvText = await res.text()
+            const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.style.display = 'none'
+            a.href = url
+            a.download = `feedbacks_${new Date().toISOString().split('T')[0]}.csv`
+            document.body.appendChild(a)
+            a.click()
+            setTimeout(() => {
+                document.body.removeChild(a)
+                window.URL.revokeObjectURL(url)
+            }, 100)
+        } catch (err) {
+            console.error('Export error:', err)
+            alert('Failed to export CSV. Please try again.')
+        } finally {
+            setExporting(false)
+        }
+    }
+
+    // Generate AI reply suggestion
+    const generateReplyTemplate = (feedback) => {
+        if (feedback.is_positive) {
+            const templates = [
+                `Thank you so much for your wonderful ${feedback.rating}-star review! We're thrilled that you had a great experience. Your kind words mean the world to us. We look forward to serving you again! 😊`,
+                `We really appreciate you taking the time to share your feedback! It makes our day to know you enjoyed your experience. Thank you for choosing us! ⭐`,
+                `Wow, thank you for the amazing review! We're so glad you loved it. Your support means everything to our team. See you again soon! 🙏`
+            ]
+            return templates[Math.floor(Math.random() * templates.length)]
+        } else {
+            const templates = [
+                `Thank you for your honest feedback. We sincerely apologize that your experience didn't meet expectations. We take every concern seriously and are working to improve. Would you be open to giving us another chance? We'd love to make it right. 🙏`,
+                `We're sorry to hear about your experience. Your feedback is valuable to us, and we're taking steps to address the issues you mentioned. Please reach out to us directly so we can resolve this for you.`,
+                `Thank you for bringing this to our attention. We're truly sorry for the inconvenience. We've shared your feedback with our team to ensure this doesn't happen again. We hope to earn back your trust. 💙`
+            ]
+            return templates[Math.floor(Math.random() * templates.length)]
+        }
+    }
+
+    // Filtered feedbacks by search, pinned first
+    const filteredFeedbacks = feedbacks.filter(fb => {
+        if (!searchQuery.trim()) return true
+        const q = searchQuery.toLowerCase()
+        return (fb.message || '').toLowerCase().includes(q) ||
+               (fb.owner_reply || '').toLowerCase().includes(q) ||
+               (fb.ai_sentiment || '').toLowerCase().includes(q)
+    }).sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
 
     const formatTime = (dateString) => {
         if (!dateString) return 'Unknown time'
@@ -470,78 +513,177 @@ export default function Dashboard() {
                     <>
                         {/* Feedback Summary */}
                         <div className="p-6 mb-8" style={glassCard}>
-                            <h2 
-                                className="text-lg font-bold mb-4"
-                                style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}
-                            >
-                                Feedback Summary
-                            </h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-center">
-                                <div 
-                                    className="p-4 rounded-xl"
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 
+                                    className="text-lg font-bold tracking-wide"
                                     style={{
-                                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%)',
-                                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                                        background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
                                     }}
                                 >
-                                    <p className="text-3xl font-bold text-blue-400">{stats.total}</p>
-                                    <p className="text-sm text-white/60">Total {getFilterLabel()}</p>
+                                    Feedback Summary
+                                </h2>
+                                <span className="text-xs text-white/40 font-medium uppercase tracking-widest">{getFilterLabel() || 'All Time'}</span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                                {[
+                                    { label: 'Total', icon: '📋', value: stats.total, color: '99, 102, 241', hex: '#818cf8', changeKey: 'totalChange' },
+                                    { label: 'Positive', icon: '👍', value: stats.positive, color: '34, 197, 94', hex: '#4ade80', changeKey: 'positiveChange' },
+                                    { label: 'Negative', icon: '👎', value: stats.negative, color: '239, 68, 68', hex: '#f87171', changeKey: 'negativeChange', invertArrow: true },
+                                    { label: 'Avg Rating', icon: '⭐', value: stats.avgRating || 0, suffix: '/5', color: '245, 158, 11', hex: '#fbbf24', changeKey: 'ratingChange', isRating: true },
+                                    { label: 'Success', icon: '📊', value: stats.positiveRate || 0, suffix: '%', color: '20, 184, 166', hex: '#2dd4bf' },
+                                ].map((card, i) => {
+                                    const change = stats.comparison?.[card.changeKey]
+                                    return (
+                                        <div key={i}
+                                            className="group relative p-5 rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.03]"
+                                            style={{
+                                                background: `linear-gradient(145deg, rgba(${card.color}, 0.15) 0%, rgba(${card.color}, 0.05) 100%)`,
+                                                border: `1px solid rgba(${card.color}, 0.2)`,
+                                                boxShadow: `0 4px 20px rgba(${card.color}, 0.08)`,
+                                            }}
+                                        >
+                                            <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full opacity-10" style={{ background: `rgba(${card.color}, 0.5)` }} />
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: `rgba(${card.color}, 0.2)` }}>{card.icon}</div>
+                                                <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{card.label}</span>
+                                            </div>
+                                            <p className="text-3xl font-extrabold" style={{ color: card.hex }}>{card.value}{card.suffix && <span className="text-lg" style={{ color: card.hex, opacity: 0.6 }}>{card.suffix}</span>}</p>
+                                            {change !== undefined && change !== null && filter !== 'all' && (
+                                                <p className={`text-xs mt-1 ${(card.invertArrow ? change <= 0 : change >= 0) ? 'text-green-400' : 'text-red-400'}`}>
+                                                    {card.isRating ? (
+                                                        <>{change >= 0 ? '↑' : '↓'} {Math.abs(change)} vs prev</>
+                                                    ) : (
+                                                        <>{(card.invertArrow ? change <= 0 : change >= 0) ? '↑' : '↓'} {Math.abs(change)}% vs prev</>
+                                                    )}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* NPS, Response Rate, Avg Response Time */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                            {/* NPS Score */}
+                            <div className="p-5 rounded-2xl" style={{
+                                background: 'linear-gradient(145deg, rgba(168, 85, 247, 0.15) 0%, rgba(168, 85, 247, 0.05) 100%)',
+                                border: '1px solid rgba(168, 85, 247, 0.2)',
+                            }}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg">🎯</span>
+                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">NPS Score</span>
                                 </div>
-                                <div 
-                                    className="p-4 rounded-xl"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%)',
-                                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                                    }}
-                                >
-                                    <p className="text-3xl font-bold text-green-400">{stats.positive}</p>
-                                    <p className="text-sm text-white/60">Positive</p>
+                                <p className="text-3xl font-extrabold" style={{ color: (stats.npsScore || 0) >= 50 ? '#4ade80' : (stats.npsScore || 0) >= 0 ? '#fbbf24' : '#f87171' }}>
+                                    {stats.npsScore || 0}
+                                </p>
+                                <p className="text-xs text-white/40 mt-1">
+                                    {(stats.npsScore || 0) >= 50 ? 'Excellent' : (stats.npsScore || 0) >= 0 ? 'Good' : 'Needs Improvement'}
+                                </p>
+                            </div>
+
+                            {/* Response Rate */}
+                            <div className="p-5 rounded-2xl" style={{
+                                background: 'linear-gradient(145deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                            }}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg">💬</span>
+                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Response Rate</span>
                                 </div>
-                                <div 
-                                    className="p-4 rounded-xl"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)',
-                                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                                    }}
-                                >
-                                    <p className="text-3xl font-bold text-red-400">{stats.negative}</p>
-                                    <p className="text-sm text-white/60">Negative</p>
+                                <p className="text-3xl font-extrabold text-blue-400">{stats.responseRate || 0}<span className="text-lg text-blue-400/60">%</span></p>
+                                <p className="text-xs text-white/40 mt-1">{stats.replied || 0} of {stats.total || 0} replied</p>
+                            </div>
+
+                            {/* Avg Response Time */}
+                            <div className="p-5 rounded-2xl" style={{
+                                background: 'linear-gradient(145deg, rgba(236, 72, 153, 0.15) 0%, rgba(236, 72, 153, 0.05) 100%)',
+                                border: '1px solid rgba(236, 72, 153, 0.2)',
+                            }}>
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-lg">⚡</span>
+                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">Avg Response Time</span>
                                 </div>
-                                <div 
-                                    className="p-4 rounded-xl"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(234, 179, 8, 0.1) 100%)',
-                                        border: '1px solid rgba(234, 179, 8, 0.3)',
-                                    }}
-                                >
-                                    <p className="text-3xl font-bold text-yellow-400">⭐ {stats.avgRating || 0}</p>
-                                    <p className="text-sm text-white/60">Avg Rating</p>
+                                <p className="text-3xl font-extrabold text-pink-400">
+                                    {stats.avgResponseTime != null ? (
+                                        stats.avgResponseTime < 1 ? '<1' : stats.avgResponseTime
+                                    ) : '—'}
+                                    {stats.avgResponseTime != null && <span className="text-lg text-pink-400/60">h</span>}
+                                </p>
+                                <p className="text-xs text-white/40 mt-1">
+                                    {stats.avgResponseTime != null ? (stats.avgResponseTime < 24 ? 'Great response time!' : 'Try to respond faster') : 'No replies yet'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Rating Distribution + Top Keywords */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            {/* Rating Distribution Bars */}
+                            <div className="p-6 rounded-2xl" style={glassCard}>
+                                <h3 className="text-sm font-bold text-white/80 mb-4 flex items-center gap-2">
+                                    <span>⭐</span> Rating Distribution
+                                </h3>
+                                <div className="space-y-3">
+                                    {[5, 4, 3, 2, 1].map(star => {
+                                        const dist = stats.ratingDistribution?.find(d => d.star === star)
+                                        const pct = dist?.percentage || 0
+                                        const count = dist?.count || 0
+                                        return (
+                                            <div key={star} className="flex items-center gap-3">
+                                                <span className="text-sm text-white/70 w-12 font-medium">{star} ⭐</span>
+                                                <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700 ease-out"
+                                                        style={{
+                                                            width: `${pct}%`,
+                                                            background: star >= 4 ? 'linear-gradient(90deg, #22c55e, #4ade80)' :
+                                                                         star === 3 ? 'linear-gradient(90deg, #f59e0b, #fbbf24)' :
+                                                                                      'linear-gradient(90deg, #ef4444, #f87171)',
+                                                            minWidth: count > 0 ? '8px' : '0',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-white/50 w-16 text-right">{count} ({pct}%)</span>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
-                                <div 
-                                    className="p-4 rounded-xl"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.2) 0%, rgba(20, 184, 166, 0.1) 100%)',
-                                        border: '1px solid rgba(20, 184, 166, 0.3)',
-                                    }}
-                                >
-                                    <p className="text-3xl font-bold text-teal-400">{stats.positiveRate || 0}%</p>
-                                    <p className="text-sm text-white/60">Positive Rate</p>
-                                </div>
-                                <div 
-                                    className="p-4 rounded-xl"
-                                    style={{
-                                        background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(234, 179, 8, 0.1) 100%)',
-                                        border: '1px solid rgba(234, 179, 8, 0.3)',
-                                    }}
-                                >
-                                    <p className="text-3xl font-bold text-yellow-400">{stats.mismatches || 0}</p>
-                                    <p className="text-sm text-white/60">⚠️ AI Mismatches</p>
-                                </div>
+                            </div>
+
+                            {/* Top Keywords */}
+                            <div className="p-6 rounded-2xl" style={glassCard}>
+                                <h3 className="text-sm font-bold text-white/80 mb-4 flex items-center gap-2">
+                                    <span>🏷️</span> Top Keywords
+                                </h3>
+                                {stats.topKeywords?.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {stats.topKeywords.map((kw, i) => {
+                                            const maxCount = stats.topKeywords[0]?.count || 1
+                                            const opacity = 0.3 + (kw.count / maxCount) * 0.7
+                                            const size = 0.7 + (kw.count / maxCount) * 0.4
+                                            return (
+                                                <span
+                                                    key={i}
+                                                    className="px-3 py-1.5 rounded-full transition-all duration-300 hover:scale-105 cursor-default"
+                                                    style={{
+                                                        background: `rgba(102, 126, 234, ${opacity * 0.3})`,
+                                                        border: `1px solid rgba(102, 126, 234, ${opacity * 0.5})`,
+                                                        color: `rgba(165, 180, 252, ${opacity + 0.2})`,
+                                                        fontSize: `${size}rem`,
+                                                    }}
+                                                    title={`Mentioned ${kw.count} times`}
+                                                >
+                                                    {kw.word} <span className="text-white/30 text-xs">×{kw.count}</span>
+                                                </span>
+                                            )
+                                        })}
+                                    </div>
+                                ) : (
+                                    <p className="text-white/40 text-sm text-center py-6">Not enough feedback data for keywords</p>
+                                )}
                             </div>
                         </div>
 
@@ -560,8 +702,8 @@ export default function Dashboard() {
                                     {feedbackType === 'all' ? 'All Feedback' : feedbackType === 'positive' ? 'Positive Feedback' : 'Negative Feedback'}
                                 </h2>
                                 
-                                {/* Feedback Type Filter */}
-                                <div className="flex gap-2">
+                                {/* Feedback Type Filter + Export */}
+                                <div className="flex gap-2 flex-wrap">
                                     <button
                                         onClick={() => setFeedbackType('all')}
                                         className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
@@ -607,8 +749,43 @@ export default function Dashboard() {
                                     >
                                         ⚠️ Negative ({stats.negative})
                                     </button>
+                                    <button
+                                        onClick={exportCSV}
+                                        disabled={exporting || feedbacks.length === 0}
+                                        className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-300"
+                                        style={{
+                                            background: 'rgba(59, 130, 246, 0.2)',
+                                            border: '1px solid rgba(59, 130, 246, 0.4)',
+                                            color: '#93c5fd',
+                                            opacity: (exporting || feedbacks.length === 0) ? 0.5 : 1,
+                                        }}
+                                    >
+                                        {exporting ? '⏳ Exporting...' : '📥 Export CSV'}
+                                    </button>
                                 </div>
                             </div>
+
+                            {/* Search Bar */}
+                            {feedbacks.length > 0 && (
+                                <div className="mb-4">
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder="🔍 Search feedback messages..."
+                                        className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none transition-all"
+                                        style={{
+                                            background: 'rgba(255, 255, 255, 0.06)',
+                                            border: '1px solid rgba(255, 255, 255, 0.12)',
+                                        }}
+                                    />
+                                    {searchQuery && (
+                                        <p className="text-xs text-white/40 mt-1 ml-1">
+                                            Showing {filteredFeedbacks.length} of {feedbacks.length} feedbacks
+                                        </p>
+                                    )}
+                                </div>
+                            )}
 
                             {feedbacks.length === 0 ? (
                                 <div className="text-center py-8">
@@ -621,498 +798,524 @@ export default function Dashboard() {
                                             : `No feedback ${getFilterLabel()}`}
                                     </p>
                                 </div>
+                            ) : filteredFeedbacks.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <span className="text-2xl block mb-2">🔍</span>
+                                    <p className="text-white/60">No feedback matches "{searchQuery}"</p>
+                                </div>
                             ) : (
-                                <ul className="space-y-3 max-h-96 overflow-y-auto">
-                                    {feedbacks.map((feedback) => (
+                                <ul className="space-y-3 max-h-[550px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                                    {filteredFeedbacks.map((feedback) => (
                                         <li
                                             key={feedback.id}
-                                            className="flex items-start justify-between p-4 rounded-xl"
-                                            style={feedback.sentiment_mismatch ? {
-                                                background: 'rgba(234, 179, 8, 0.1)',
-                                                borderLeft: '4px solid rgba(250, 204, 21, 0.7)',
-                                                border: '1px solid rgba(234, 179, 8, 0.3)',
-                                            } : feedback.is_positive ? {
-                                                background: 'rgba(34, 197, 94, 0.1)',
+                                            className="p-4 rounded-xl transition-all duration-200"
+                                            style={feedback.is_positive ? {
+                                                background: feedback.is_pinned ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.1)',
                                                 borderLeft: '4px solid rgba(74, 222, 128, 0.6)',
-                                                border: '1px solid rgba(34, 197, 94, 0.2)',
+                                                border: `1px solid rgba(34, 197, 94, ${feedback.is_pinned ? '0.4' : '0.2'})`,
+                                                boxShadow: feedback.is_pinned ? '0 0 12px rgba(245, 158, 11, 0.15)' : 'none',
                                             } : {
-                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                background: feedback.is_pinned ? 'rgba(239, 68, 68, 0.18)' : 'rgba(239, 68, 68, 0.1)',
                                                 borderLeft: '4px solid rgba(248, 113, 113, 0.6)',
-                                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                                border: `1px solid rgba(239, 68, 68, ${feedback.is_pinned ? '0.4' : '0.2'})`,
+                                                boxShadow: feedback.is_pinned ? '0 0 12px rgba(245, 158, 11, 0.15)' : 'none',
                                             }}
                                         >
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                    <span className="text-yellow-400">
-                                                        {'★'.repeat(feedback.rating)}{'☆'.repeat(5 - feedback.rating)}
-                                                    </span>
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                                        feedback.is_positive 
-                                                            ? 'bg-green-500/20 text-green-400' 
-                                                            : 'bg-red-500/20 text-red-400'
-                                                    }`}>
-                                                        {feedback.is_positive ? 'Positive' : 'Negative'}
-                                                    </span>
-                                                    {/* AI Sentiment Badge */}
-                                                    {feedback.ai_sentiment && (
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                                            feedback.ai_sentiment === 'positive' 
-                                                                ? 'bg-emerald-500/20 text-emerald-300' 
-                                                                : feedback.ai_sentiment === 'negative'
-                                                                ? 'bg-rose-500/20 text-rose-300'
-                                                                : 'bg-gray-500/20 text-gray-300'
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                        {feedback.is_pinned && (
+                                                            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}>
+                                                                📌 Pinned
+                                                            </span>
+                                                        )}
+                                                        <span className="text-yellow-400">
+                                                            {'★'.repeat(feedback.rating)}{'☆'.repeat(5 - feedback.rating)}
+                                                        </span>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                            feedback.is_positive 
+                                                                ? 'bg-green-500/20 text-green-400' 
+                                                                : 'bg-red-500/20 text-red-400'
                                                         }`}>
-                                                            🤖 AI: {feedback.ai_sentiment}
-                                                            {feedback.ai_confidence && (
-                                                                <span className="text-white/40">({feedback.ai_confidence}%)</span>
-                                                            )}
+                                                            {feedback.is_positive ? 'Positive' : 'Negative'}
                                                         </span>
-                                                    )}
-                                                    {/* Mismatch Warning */}
-                                                    {feedback.sentiment_mismatch && (
-                                                        <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 flex items-center gap-1">
-                                                            ⚠️ Mismatch
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {/* Mismatch explanation */}
-                                                {feedback.sentiment_mismatch && (
-                                                    <p className="text-xs text-yellow-400/80 mb-1 italic">
-                                                        ⚠️ Rating is {feedback.rating}★ but AI detected {feedback.ai_sentiment} sentiment in the review text
+                                                        {feedback.ai_sentiment && feedback.ai_sentiment !== (feedback.is_positive ? 'positive' : 'negative') && (
+                                                            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">
+                                                                ⚠️ AI Override
+                                                            </span>
+                                                        )}
+                                                        {feedback.owner_reply && (
+                                                            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
+                                                                ✅ Replied
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-white/90 text-sm">
+                                                        "{feedback.message || 'No message provided'}"
                                                     </p>
-                                                )}
-                                                <p className="text-white/90">
-                                                    "{feedback.message || 'No message provided'}"
-                                                </p>
+                                                </div>
+                                                <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                                                    <span className="text-xs text-white/40 whitespace-nowrap">
+                                                        {formatDate(feedback.created_at)} {formatTime(feedback.created_at)}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => pinFeedback(feedback.id)}
+                                                        className="text-xs px-1.5 py-1 rounded-lg transition-all hover:bg-amber-500/20"
+                                                        style={{ color: feedback.is_pinned ? '#fbbf24' : '#ffffff60', opacity: feedback.is_pinned ? 1 : 0.5 }}
+                                                        title={feedback.is_pinned ? 'Unpin feedback' : 'Pin feedback'}
+                                                    >
+                                                        📌
+                                                    </button>
+                                                    <button
+                                                        onClick={() => deleteFeedback(feedback.id)}
+                                                        disabled={deletingId === feedback.id}
+                                                        className="text-xs px-1.5 py-1 rounded-lg transition-all hover:bg-red-500/20"
+                                                        style={{ color: '#f87171', opacity: deletingId === feedback.id ? 0.3 : 0.5 }}
+                                                        title="Delete feedback"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <span className="text-sm text-white/50 ml-4 whitespace-nowrap">
-                                                {formatDate(feedback.created_at)} {formatTime(feedback.created_at)}
-                                            </span>
+
+                                            {/* Owner Reply Display */}
+                                            {feedback.owner_reply && replyingTo !== feedback.id && (
+                                                <div 
+                                                    className="mt-3 p-3 rounded-lg ml-4"
+                                                    style={{
+                                                        background: 'rgba(59, 130, 246, 0.08)',
+                                                        border: '1px solid rgba(59, 130, 246, 0.15)',
+                                                        borderLeft: '3px solid rgba(96, 165, 250, 0.5)',
+                                                    }}
+                                                >
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-xs font-semibold text-blue-400">💬 Your Reply</span>
+                                                        <span className="text-xs text-white/30">
+                                                            {feedback.replied_at && formatDate(feedback.replied_at)}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-xs text-white/70">{feedback.owner_reply}</p>
+                                                </div>
+                                            )}
+
+                                            {/* Reply Actions */}
+                                            <div className="mt-2 flex gap-2">
+                                                {replyingTo !== feedback.id ? (
+                                                    <button
+                                                        onClick={() => {
+                                                            setReplyingTo(feedback.id)
+                                                            setReplyText(feedback.owner_reply || '')
+                                                        }}
+                                                        className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                                                        style={{
+                                                            background: 'rgba(59, 130, 246, 0.15)',
+                                                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                            color: '#93c5fd',
+                                                        }}
+                                                    >
+                                                        {feedback.owner_reply ? '✏️ Edit Reply' : '💬 Reply'}
+                                                        {feedback.has_email && <span title="Reply will be emailed to customer" className="ml-1">📧</span>}
+                                                    </button>
+                                                ) : (
+                                                    <div className="flex-1">
+                                                        <div className="flex gap-2 mb-2">
+                                                            <button
+                                                                onClick={() => setReplyText(generateReplyTemplate(feedback))}
+                                                                className="text-xs px-2 py-1 rounded-lg transition-all"
+                                                                style={{
+                                                                    background: 'rgba(139, 92, 246, 0.15)',
+                                                                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                                                                    color: '#c4b5fd',
+                                                                }}
+                                                                title="Generate AI reply suggestion"
+                                                            >
+                                                                🤖 AI Suggest
+                                                            </button>
+                                                        </div>
+                                                        <textarea
+                                                            value={replyText}
+                                                            onChange={(e) => setReplyText(e.target.value)}
+                                                            placeholder="Write your reply..."
+                                                            rows={3}
+                                                            className="w-full px-3 py-2 rounded-lg text-sm text-white placeholder-white/30 focus:outline-none resize-none"
+                                                            style={{
+                                                                background: 'rgba(255, 255, 255, 0.06)',
+                                                                border: '1px solid rgba(59, 130, 246, 0.3)',
+                                                            }}
+                                                        />
+                                                        {feedback.has_email && (
+                                                            <p className="text-xs mt-1" style={{ color: '#60a5fa' }}>
+                                                                📧 This reply will be emailed to the customer from ReviewDock
+                                                            </p>
+                                                        )}
+                                                        <div className="flex gap-2 mt-2">
+                                                            <button
+                                                                onClick={() => replyToFeedback(feedback.id)}
+                                                                disabled={!replyText.trim() || replySending}
+                                                                className="text-xs px-4 py-1.5 rounded-lg font-medium transition-all"
+                                                                style={{
+                                                                    background: 'rgba(34, 197, 94, 0.2)',
+                                                                    border: '1px solid rgba(34, 197, 94, 0.4)',
+                                                                    color: '#4ade80',
+                                                                    opacity: (!replyText.trim() || replySending) ? 0.5 : 1,
+                                                                }}
+                                                            >
+                                                                {replySending ? '⏳ Sending...' : '✓ Send Reply'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => { setReplyingTo(null); setReplyText('') }}
+                                                                className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                                                                style={{
+                                                                    background: 'rgba(255, 255, 255, 0.08)',
+                                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                                    color: 'rgba(255, 255, 255, 0.6)',
+                                                                }}
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
 
-                        {/* External Feedback Input (AI Analysis) */}
-                        <div className="p-6 mt-6" style={glassCard}>
-                            <h2 
-                                className="text-lg font-bold mb-1"
-                                style={{
-                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
-                                }}
-                            >
-                                🤖 AI Feedback Analyzer
-                            </h2>
-                            <p className="text-xs text-white/50 mb-4">
-                                Paste any review page URL below, or click "Analyze" on a saved platform.
-                            </p>
+                        {/* Saved External Feedback Analyses from Settings */}
+                        {savedSummaries.length > 0 && (
+                            <div className="p-6 mt-6" style={glassCard}>
+                                <h2 
+                                    className="text-lg font-bold mb-1"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #ffffff 0%, #c084fc 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text',
+                                    }}
+                                >
+                                    📊 Saved Feedback Analyses
+                                </h2>
+                                <p className="text-xs text-white/50 mb-4">
+                                    Summaries you saved in Settings. Click "Analyze" to run AI sentiment analysis.
+                                </p>
 
-                            {/* Quick URL Input */}
-                            <div className="mb-4">
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={quickUrl}
-                                        onChange={(e) => setQuickUrl(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && analyzeQuickUrl()}
-                                        placeholder="Paste any review link (Google Maps, Yelp, TripAdvisor...)"
-                                        className="flex-1 px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none"
-                                        style={{
-                                            background: 'rgba(255, 255, 255, 0.06)',
-                                            border: '1px solid rgba(255, 255, 255, 0.12)',
-                                        }}
-                                    />
-                                    <button
-                                        onClick={analyzeQuickUrl}
-                                        disabled={!quickUrl.trim() || urlAnalyzing}
-                                        className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex-shrink-0"
-                                        style={{
-                                            background: (!quickUrl.trim() || urlAnalyzing)
-                                                ? 'rgba(139, 92, 246, 0.15)'
-                                                : 'linear-gradient(135deg, rgba(139, 92, 246, 0.5) 0%, rgba(118, 75, 162, 0.5) 100%)',
-                                            border: '1px solid rgba(139, 92, 246, 0.5)',
-                                            color: 'white',
-                                            opacity: (!quickUrl.trim() || urlAnalyzing) ? 0.5 : 1,
-                                            cursor: (!quickUrl.trim() || urlAnalyzing) ? 'not-allowed' : 'pointer',
-                                        }}
-                                    >
-                                        {urlAnalyzing && !selectedPlatform?.id !== 'quick' ? (
-                                            <span className="flex items-center gap-2">
-                                                <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
-                                                Analyzing...
-                                            </span>
-                                        ) : '🤖 Analyze'}
-                                    </button>
-                                </div>
-                                <p className="text-xs text-white/30 mt-1.5 ml-1">Supports Google Maps, Yelp, TripAdvisor, Trustpilot, Zomato, Swiggy & more</p>
-                            </div>
-
-                            {/* Saved Platform Cards with Analyze button */}
-                            {savedPlatforms.length > 0 && (
-                                <div className="mb-4">
-                                    <p className="text-xs font-medium text-white/60 mb-2">📌 Your Saved Platforms</p>
-                                    <div className="space-y-2">
-                                        {savedPlatforms.map((platform) => (
-                                            <div
-                                                key={platform.id}
-                                                className="flex items-center gap-3 p-3 rounded-xl transition-all duration-200"
-                                                style={selectedPlatform?.id === platform.id && (urlAnalyzing || urlAnalysis) ? {
-                                                    background: 'rgba(139, 92, 246, 0.15)',
-                                                    border: '1px solid rgba(139, 92, 246, 0.4)',
-                                                } : {
-                                                    background: 'rgba(255, 255, 255, 0.04)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                                }}
-                                            >
-                                                <span className="text-xl">
-                                                    {platformIcons[platform.platform_name] || platformIcons.custom}
-                                                </span>
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="text-sm font-medium text-white/90 block">
-                                                        {platform.platform_label}
-                                                    </span>
-                                                    <span className="text-xs text-white/40 truncate block">
-                                                        {platform.url}
-                                                    </span>
-                                                </div>
-                                                <button
-                                                    onClick={() => analyzeUrl(platform)}
-                                                    disabled={urlAnalyzing && selectedPlatform?.id === platform.id}
-                                                    className="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex-shrink-0"
-                                                    style={{
-                                                        background: (urlAnalyzing && selectedPlatform?.id === platform.id)
-                                                            ? 'rgba(139, 92, 246, 0.2)'
-                                                            : 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
-                                                        border: '1px solid rgba(139, 92, 246, 0.5)',
-                                                        color: 'white',
-                                                        cursor: (urlAnalyzing && selectedPlatform?.id === platform.id) ? 'not-allowed' : 'pointer',
+                                {/* Summary Cards */}
+                                <div className="space-y-3 mb-4">
+                                    {savedSummaries.map((summary) => {
+                                        const sourceIcons = {
+                                            google_form: '📋', google_review: '⭐', survey: '📝', email: '📧', other: '🔗'
+                                        }
+                                        const sourceLabels = {
+                                            google_form: 'Google Form', google_review: 'Google Review', survey: 'Survey', email: 'Email', other: 'Other'
+                                        }
+                                        const isSelected = selectedSummary?.id === summary.id
+                                        
+                                        return (
+                                            <div key={summary.id}>
+                                                <div
+                                                    className="flex items-center gap-3 p-4 rounded-xl transition-all duration-200 cursor-pointer"
+                                                    style={isSelected ? {
+                                                        background: 'rgba(139, 92, 246, 0.15)',
+                                                        border: '1px solid rgba(139, 92, 246, 0.4)',
+                                                    } : {
+                                                        background: summary.is_analyzed 
+                                                            ? 'rgba(34, 197, 94, 0.06)' 
+                                                            : 'rgba(255, 255, 255, 0.04)',
+                                                        border: summary.is_analyzed 
+                                                            ? '1px solid rgba(34, 197, 94, 0.15)' 
+                                                            : '1px solid rgba(255, 255, 255, 0.08)',
                                                     }}
+                                                    onClick={() => summary.is_analyzed ? viewSummaryAnalysis(summary) : null}
                                                 >
-                                                    {urlAnalyzing && selectedPlatform?.id === platform.id ? (
-                                                        <span className="flex items-center gap-2">
-                                                            <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
-                                                            Analyzing...
-                                                        </span>
-                                                    ) : isProtectedPlatform(platform.url) ? '📋 Paste & Analyze' : isGoogleMapsUrl(platform.url) ? '📍 Paste Reviews' : '🤖 Analyze'}
-                                                </button>
+                                                    <span className="text-2xl">
+                                                        {sourceIcons[summary.source_type] || '🔗'}
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-sm font-medium text-white/90">
+                                                                {summary.title}
+                                                            </span>
+                                                            <span 
+                                                                className="text-xs px-2 py-0.5 rounded-full"
+                                                                style={{
+                                                                    background: 'rgba(139, 92, 246, 0.15)',
+                                                                    color: '#c4b5fd'
+                                                                }}
+                                                            >
+                                                                {sourceLabels[summary.source_type] || 'External'}
+                                                            </span>
+                                                            {summary.is_analyzed && (
+                                                                <span 
+                                                                    className="text-xs px-2 py-0.5 rounded-full"
+                                                                    style={{
+                                                                        background: summary.overall_sentiment === 'positive' 
+                                                                            ? 'rgba(34, 197, 94, 0.2)' 
+                                                                            : summary.overall_sentiment === 'negative'
+                                                                            ? 'rgba(239, 68, 68, 0.2)'
+                                                                            : 'rgba(245, 158, 11, 0.2)',
+                                                                        color: summary.overall_sentiment === 'positive' 
+                                                                            ? '#4ade80' 
+                                                                            : summary.overall_sentiment === 'negative'
+                                                                            ? '#f87171'
+                                                                            : '#fbbf24'
+                                                                    }}
+                                                                >
+                                                                    {summary.overall_sentiment === 'positive' ? '👍' : summary.overall_sentiment === 'negative' ? '👎' : '🔄'} {summary.overall_sentiment} ({summary.overall_score}%)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-white/40 mt-0.5">
+                                                            Saved {new Date(summary.created_at).toLocaleDateString()}
+                                                            {summary.is_analyzed && ` • ${summary.total_reviews_found} reviews found • 👍${summary.positive_count} 👎${summary.negative_count}`}
+                                                            {summary.analyzed_at && ` • Analyzed ${new Date(summary.analyzed_at).toLocaleDateString()}`}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex gap-2 flex-shrink-0">
+                                                        {summary.is_analyzed && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); viewSummaryAnalysis(summary); }}
+                                                                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
+                                                                style={{
+                                                                    background: 'rgba(59, 130, 246, 0.2)',
+                                                                    border: '1px solid rgba(59, 130, 246, 0.4)',
+                                                                    color: '#93c5fd',
+                                                                }}
+                                                            >
+                                                                👁️ View
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); analyzeSavedSummary(summary); }}
+                                                            disabled={summaryAnalyzing && selectedSummary?.id === summary.id}
+                                                            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
+                                                            style={{
+                                                                background: (summaryAnalyzing && selectedSummary?.id === summary.id)
+                                                                    ? 'rgba(139, 92, 246, 0.2)'
+                                                                    : 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
+                                                                border: '1px solid rgba(139, 92, 246, 0.5)',
+                                                                color: 'white',
+                                                                cursor: (summaryAnalyzing && selectedSummary?.id === summary.id) ? 'not-allowed' : 'pointer',
+                                                            }}
+                                                        >
+                                                            {summaryAnalyzing && selectedSummary?.id === summary.id ? (
+                                                                <span className="flex items-center gap-2">
+                                                                    <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
+                                                                    Analyzing...
+                                                                </span>
+                                                            ) : summary.is_analyzed ? '🔄 Re-Analyze' : '🤖 Analyze'}
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
+                                        )
+                                    })}
                                 </div>
-                            )}
 
-                            {/* URL Analysis Results */}
-                            {urlAnalysis && selectedPlatform && (
-                                <div className="mb-4">
-                                    <div className="flex items-center justify-between mb-3">
-                                        <span className="text-sm font-semibold text-purple-300">
-                                            {platformIcons[selectedPlatform.platform_name] || '🔗'} {urlAnalysis.platformName} — Analysis Results
-                                        </span>
-                                        <button
-                                            onClick={() => { setUrlAnalysis(null); setSelectedPlatform(null); setUrlError(''); }}
-                                            className="text-xs text-white/40 hover:text-white/70 transition-all"
+                                {/* Summary Analysis Results */}
+                                {summaryAnalysis && selectedSummary && (
+                                    <div className="mt-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-sm font-semibold text-purple-300">
+                                                📊 Analysis Results — {selectedSummary.title}
+                                            </span>
+                                            <button
+                                                onClick={() => { setSummaryAnalysis(null); setSelectedSummary(null); setSummaryError(''); }}
+                                                className="text-xs text-white/40 hover:text-white/70 transition-all"
+                                            >
+                                                ✕ Close
+                                            </button>
+                                        </div>
+
+                                        {/* Overall Summary Card */}
+                                        <div 
+                                            className="p-4 rounded-xl mb-3"
+                                            style={{
+                                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(118, 75, 162, 0.08) 100%)',
+                                                border: '1px solid rgba(139, 92, 246, 0.25)',
+                                            }}
                                         >
-                                            ✕ Close
-                                        </button>
-                                    </div>
-
-                                    {/* Overall Summary */}
-                                    <div 
-                                        className="p-4 rounded-xl mb-3"
-                                        style={{
-                                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(118, 75, 162, 0.08) 100%)',
-                                            border: '1px solid rgba(139, 92, 246, 0.25)',
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className="text-xs font-semibold text-purple-300">Overall</span>
-                                            {urlAnalysis.overallSentiment && (
-                                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                                    urlAnalysis.overallSentiment === 'positive' ? 'bg-green-500/20 text-green-400' :
-                                                    urlAnalysis.overallSentiment === 'negative' ? 'bg-red-500/20 text-red-400' :
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <span className="text-xs font-semibold text-purple-300">Overall Verdict</span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                                                    summaryAnalysis.overallSentiment === 'positive' ? 'bg-green-500/20 text-green-400' :
+                                                    summaryAnalysis.overallSentiment === 'negative' ? 'bg-red-500/20 text-red-400' :
                                                     'bg-yellow-500/20 text-yellow-400'
                                                 }`}>
-                                                    {urlAnalysis.overallSentiment}
+                                                    {summaryAnalysis.overallSentiment === 'positive' ? '👍 POSITIVE' : 
+                                                     summaryAnalysis.overallSentiment === 'negative' ? '👎 NEGATIVE' : '🔄 MIXED'}
                                                 </span>
+                                                <span className="text-xs text-white/50">Score: {summaryAnalysis.overallScore}/100</span>
+                                                {summaryAnalysis.accuracy && (
+                                                    <span className="text-xs text-white/40 ml-auto">🎯 {summaryAnalysis.accuracy}% accuracy</span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-white/80">{summaryAnalysis.overallSummary}</p>
+                                            {summaryAnalysis.averageRating && (
+                                                <p className="text-xs text-white/50 mt-2">
+                                                    ⭐ Average Rating: {summaryAnalysis.averageRating}/5 • {summaryAnalysis.totalFound} reviews found
+                                                </p>
                                             )}
-                                            {urlAnalysis.overallScore > 0 && (
-                                                <span className="text-xs text-white/50">Score: {urlAnalysis.overallScore}/100</span>
-                                            )}
-                                            <span className="text-xs text-white/40 ml-auto">
-                                                {urlAnalysis.totalFound} feedback(s) found • {urlAnalysis.savedCount || 0} saved
-                                            </span>
                                         </div>
-                                        <p className="text-sm text-white/80">{urlAnalysis.overallSummary}</p>
-                                    </div>
 
-                                    {/* Positive / Negative counts */}
-                                    {(urlAnalysis.positiveCount > 0 || urlAnalysis.negativeCount > 0) && (
+                                        {/* Positive / Negative Counts */}
                                         <div className="flex gap-3 mb-3">
-                                            <div className="flex-1 p-3 rounded-xl text-center" style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
-                                                <span className="text-lg font-bold text-green-400">{urlAnalysis.positiveCount}</span>
+                                            <div className="flex-1 p-4 rounded-xl text-center" style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+                                                <span className="text-2xl font-bold text-green-400">{summaryAnalysis.positiveCount}</span>
                                                 <p className="text-xs text-green-400/70">Positive</p>
                                             </div>
-                                            <div className="flex-1 p-3 rounded-xl text-center" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                                <span className="text-lg font-bold text-red-400">{urlAnalysis.negativeCount}</span>
+                                            <div className="flex-1 p-4 rounded-xl text-center" style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                                <span className="text-2xl font-bold text-red-400">{summaryAnalysis.negativeCount}</span>
                                                 <p className="text-xs text-red-400/70">Negative</p>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                                        {/* Positive Points */}
-                                        {urlAnalysis.topPositivePoints?.length > 0 && (
-                                            <div className="p-3 rounded-xl" style={{ background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
-                                                <h4 className="text-xs font-semibold text-green-400 mb-1">👍 Positive</h4>
-                                                <ul className="space-y-1">
-                                                    {urlAnalysis.topPositivePoints.map((p, i) => (
-                                                        <li key={i} className="text-xs text-white/70 flex items-start gap-1">
-                                                            <span className="text-green-400 mt-0.5">•</span> {p}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                        {/* Negative Points */}
-                                        {urlAnalysis.topNegativePoints?.length > 0 && (
-                                            <div className="p-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                                                <h4 className="text-xs font-semibold text-red-400 mb-1">👎 Needs Improvement</h4>
-                                                <ul className="space-y-1">
-                                                    {urlAnalysis.topNegativePoints.map((p, i) => (
-                                                        <li key={i} className="text-xs text-white/70 flex items-start gap-1">
-                                                            <span className="text-red-400 mt-0.5">•</span> {p}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Recommendations */}
-                                    {urlAnalysis.recommendations?.length > 0 && (
-                                        <div className="p-3 rounded-xl mb-3" style={{ background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
-                                            <h4 className="text-xs font-semibold text-blue-400 mb-1">💡 Recommendations</h4>
-                                            <ul className="space-y-1">
-                                                {urlAnalysis.recommendations.map((r, i) => (
-                                                    <li key={i} className="text-xs text-white/70 flex items-start gap-1">
-                                                        <span className="text-blue-400 mt-0.5">{i + 1}.</span> {r}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-
-                                    {/* Individual feedbacks */}
-                                    {urlAnalysis.feedbacks?.length > 0 && (
-                                        <div className="p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                                            <h4 className="text-xs font-semibold text-white/70 mb-2">📝 Individual Feedbacks ({urlAnalysis.feedbacks.length})</h4>
-                                            <div className="space-y-2 max-h-60 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-                                                {urlAnalysis.feedbacks.map((fb, i) => (
-                                                    <div key={i} className="flex items-start gap-2 p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                                                        <span className={`text-xs mt-0.5 ${
-                                                            fb.sentiment === 'positive' ? 'text-green-400' :
-                                                            fb.sentiment === 'negative' ? 'text-red-400' : 'text-yellow-400'
-                                                        }`}>
-                                                            {fb.sentiment === 'positive' ? '👍' : fb.sentiment === 'negative' ? '👎' : '😐'}
-                                                        </span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-xs text-white/70 line-clamp-2">{fb.text || fb.summary}</p>
-                                                            <div className="flex gap-2 mt-1">
-                                                                <span className={`text-xs ${
-                                                                    fb.sentiment === 'positive' ? 'text-green-400/70' :
-                                                                    fb.sentiment === 'negative' ? 'text-red-400/70' : 'text-yellow-400/70'
-                                                                }`}>{fb.sentiment}</span>
-                                                                {fb.rating && <span className="text-xs text-white/40">{'⭐'.repeat(fb.rating)}</span>}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* URL Error */}
-                            {urlError && urlError !== 'google_forms_guide' && urlError !== 'google_maps_guide' && (
-                                <div className="p-3 rounded-xl mb-4" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                                    <p className="text-xs text-red-400">⚠️ {urlError}</p>
-                                    <p className="text-xs text-white/40 mt-1">Some pages require login or have dynamic content. Try the manual paste option below.</p>
-                                </div>
-                            )}
-
-                            {/* Google Forms Export Guide */}
-                            {urlError === 'google_forms_guide' && (
-                                <div className="p-4 rounded-xl mb-4" style={{ background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.08) 100%)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                    <h4 className="text-sm font-semibold text-blue-400 mb-2">📋 How to export Google Forms responses</h4>
-                                    <p className="text-xs text-white/60 mb-3">Google Forms responses require login to access. Follow these quick steps to copy them:</p>
-                                    <ol className="space-y-2 text-xs text-white/70">
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-blue-400 font-bold mt-0.5">1.</span>
-                                            <span>Open your Google Form → click the <strong className="text-white/90">Responses</strong> tab</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-blue-400 font-bold mt-0.5">2.</span>
-                                            <span>Click <strong className="text-white/90">Summary</strong> to see all responses, then <strong className="text-white/90">Select All (Ctrl+A)</strong> and <strong className="text-white/90">Copy (Ctrl+C)</strong></span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-blue-400 font-bold mt-0.5">3.</span>
-                                            <span><strong className="text-white/90">Paste below (Ctrl+V)</strong> — our AI will analyze all your responses instantly!</span>
-                                        </li>
-                                    </ol>
-                                    <div className="mt-3 flex items-center gap-2">
-                                        <a
-                                            href={selectedPlatform?.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'rgba(59, 130, 246, 0.2)', border: '1px solid rgba(59, 130, 246, 0.4)', color: '#93c5fd' }}
-                                        >
-                                            🔗 Open Google Form
-                                        </a>
-                                        <span className="text-xs text-white/30">→ Copy responses → Paste below</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Google Maps Review Guide */}
-                            {urlError === 'google_maps_guide' && (
-                                <div className="p-4 rounded-xl mb-4" style={{ background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%)', border: '1px solid rgba(34, 197, 94, 0.25)' }}>
-                                    <h4 className="text-sm font-semibold text-green-400 mb-2">📍 How to copy Google Maps reviews</h4>
-                                    <p className="text-xs text-white/60 mb-3">Google Maps reviews are loaded dynamically and can't be directly scraped. Here's how to copy them:</p>
-                                    <ol className="space-y-2 text-xs text-white/70">
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-400 font-bold mt-0.5">1.</span>
-                                            <span>Open the Google Maps link → click <strong className="text-white/90">Reviews</strong> to see all reviews</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-400 font-bold mt-0.5">2.</span>
-                                            <span>Scroll down to load more reviews, then <strong className="text-white/90">Select All (Ctrl+A)</strong> and <strong className="text-white/90">Copy (Ctrl+C)</strong></span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <span className="text-green-400 font-bold mt-0.5">3.</span>
-                                            <span><strong className="text-white/90">Paste below (Ctrl+V)</strong> — AI will identify each review and analyze sentiment!</span>
-                                        </li>
-                                    </ol>
-                                    <div className="mt-3 flex items-center gap-2">
-                                        <a
-                                            href={selectedPlatform?.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-                                            style={{ background: 'rgba(34, 197, 94, 0.2)', border: '1px solid rgba(34, 197, 94, 0.4)', color: '#86efac' }}
-                                        >
-                                            📍 Open Google Maps
-                                        </a>
-                                        <span className="text-xs text-white/30">→ Go to Reviews → Select All → Copy → Paste below</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Manual Input Fallback */}
-                            <div className="mt-3">
-                                {!showManualInput ? (
-                                    <button
-                                        onClick={() => { setShowManualInput(true); setSelectedPlatform(null); setUrlAnalysis(null); setUrlError(''); }}
-                                        className="w-full py-3 rounded-xl text-sm text-white/50 transition-all"
-                                        style={{
-                                            background: 'rgba(255, 255, 255, 0.03)',
-                                            border: '1px dashed rgba(255, 255, 255, 0.15)',
-                                        }}
-                                    >
-                                        ✏️ Or paste feedback manually
-                                    </button>
-                                ) : (
-                                    <div>
-                                        <div className="flex gap-2 mb-3">
-                                            {['Google Maps', 'Google Form', 'Survey', 'Email', 'Other'].map(src => (
-                                                <button
-                                                    key={src}
-                                                    onClick={() => setExternalSource(src)}
-                                                    className="px-3 py-1 rounded-lg text-xs font-medium transition-all"
-                                                    style={externalSource === src ? {
-                                                        background: 'rgba(139, 92, 246, 0.3)',
-                                                        border: '1px solid rgba(139, 92, 246, 0.5)',
-                                                        color: '#c4b5fd',
-                                                    } : {
-                                                        background: 'rgba(255, 255, 255, 0.05)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                        color: 'rgba(255, 255, 255, 0.5)',
-                                                    }}
-                                                >
-                                                    {src}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <textarea
-                                            value={externalText}
-                                            onChange={(e) => setExternalText(e.target.value)}
-                                            placeholder={urlError === 'google_forms_guide' 
-                                                ? "Paste your Google Forms responses here...\n\nGo to your form → Responses tab → Summary → Select All (Ctrl+A) → Copy (Ctrl+C) → Paste here (Ctrl+V)"
-                                                : urlError === 'google_maps_guide'
-                                                ? "Paste Google Maps reviews here...\n\nOpen the Maps link → Click Reviews → Scroll to load reviews → Select All (Ctrl+A) → Copy (Ctrl+C) → Paste here (Ctrl+V)"
-                                                : "Paste feedback text here... e.g. 'The food was amazing but the wait time was too long'"
-                                            }
-                                            autoFocus={urlError === 'google_forms_guide' || urlError === 'google_maps_guide'}
-                                            className="w-full px-4 py-3 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none resize-none"
-                                            style={{
-                                                background: 'rgba(255, 255, 255, 0.05)',
-                                                border: (urlError === 'google_forms_guide' || urlError === 'google_maps_guide')
-                                                    ? `1px solid ${urlError === 'google_maps_guide' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(59, 130, 246, 0.3)'}` 
-                                                    : '1px solid rgba(255, 255, 255, 0.1)',
-                                                minHeight: (urlError === 'google_forms_guide' || urlError === 'google_maps_guide') ? '120px' : '80px',
-                                            }}
-                                            rows={(urlError === 'google_forms_guide' || urlError === 'google_maps_guide') ? 5 : 3}
-                                        />
-                                        <div className="flex items-center gap-3 mt-3">
-                                            <button
-                                                onClick={submitExternalFeedback}
-                                                disabled={!externalText.trim() || externalSubmitting}
-                                                className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300"
-                                                style={{
-                                                    background: externalSubmitting ? 'rgba(139, 92, 246, 0.2)' : 'linear-gradient(135deg, rgba(139, 92, 246, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
-                                                    border: '1px solid rgba(139, 92, 246, 0.5)',
-                                                    color: 'white',
-                                                    opacity: (!externalText.trim() || externalSubmitting) ? 0.5 : 1,
-                                                    cursor: (!externalText.trim() || externalSubmitting) ? 'not-allowed' : 'pointer',
-                                                }}
-                                            >
-                                                {externalSubmitting ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
-                                                        Analyzing...
-                                                    </span>
-                                                ) : '🤖 Analyze & Save'}
-                                            </button>
-                                            <button
-                                                onClick={() => { setShowManualInput(false); setExternalText(''); setExternalSuccess(''); }}
-                                                className="px-3 py-2 rounded-xl text-xs text-white/50 transition-all"
-                                                style={{
-                                                    background: 'rgba(255, 255, 255, 0.05)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                }}
-                                            >
-                                                ✕ Cancel
-                                            </button>
-                                            {externalSuccess && (
-                                                <p className="text-xs text-green-400">{externalSuccess}</p>
+                                            {summaryAnalysis.neutralCount > 0 && (
+                                                <div className="flex-1 p-4 rounded-xl text-center" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                                                    <span className="text-2xl font-bold text-yellow-400">{summaryAnalysis.neutralCount}</span>
+                                                    <p className="text-xs text-yellow-400/70">Neutral</p>
+                                                </div>
                                             )}
                                         </div>
+
+                                        {/* Sentiment Distribution */}
+                                        {summaryAnalysis.sentimentDistribution && (
+                                            <div className="p-3 rounded-xl mb-3" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                                <h4 className="text-xs font-semibold text-white/60 mb-2">📈 Rating Distribution</h4>
+                                                <div className="space-y-1.5">
+                                                    {[
+                                                        { label: '5 ★', key: 'veryPositive', color: '#22c55e' },
+                                                        { label: '4 ★', key: 'positive', color: '#4ade80' },
+                                                        { label: '3 ★', key: 'neutral', color: '#fbbf24' },
+                                                        { label: '2 ★', key: 'negative', color: '#f87171' },
+                                                        { label: '1 ★', key: 'veryNegative', color: '#ef4444' },
+                                                    ].map(({ label, key, color }) => {
+                                                        const count = summaryAnalysis.sentimentDistribution[key] || 0
+                                                        const maxCount = Math.max(...Object.values(summaryAnalysis.sentimentDistribution).map(Number).filter(n => !isNaN(n)), 1)
+                                                        const width = maxCount > 0 ? (count / maxCount) * 100 : 0
+                                                        return (
+                                                            <div key={key} className="flex items-center gap-2">
+                                                                <span className="text-xs text-white/50 w-8">{label}</span>
+                                                                <div className="flex-1 h-4 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                                                    <div 
+                                                                        className="h-full rounded-full transition-all duration-500"
+                                                                        style={{ width: `${width}%`, background: color, minWidth: count > 0 ? '8px' : '0' }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-xs text-white/40 w-6 text-right">{count}</span>
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Key Themes */}
+                                        {summaryAnalysis.keyThemes?.length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {summaryAnalysis.keyThemes.map((theme, i) => (
+                                                    <span 
+                                                        key={i}
+                                                        className="text-xs px-3 py-1 rounded-full"
+                                                        style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#c4b5fd', border: '1px solid rgba(139, 92, 246, 0.25)' }}
+                                                    >
+                                                        {theme}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                            {/* Positive Points */}
+                                            {summaryAnalysis.topPositivePoints?.length > 0 && (
+                                                <div className="p-3 rounded-xl" style={{ background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 94, 0.15)' }}>
+                                                    <h4 className="text-xs font-semibold text-green-400 mb-2">👍 Strengths</h4>
+                                                    <ul className="space-y-1">
+                                                        {summaryAnalysis.topPositivePoints.map((p, i) => (
+                                                            <li key={i} className="text-xs text-white/70 flex items-start gap-1">
+                                                                <span className="text-green-400 mt-0.5">•</span> {p}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {/* Negative Points */}
+                                            {summaryAnalysis.topNegativePoints?.length > 0 && (
+                                                <div className="p-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                                                    <h4 className="text-xs font-semibold text-red-400 mb-2">👎 Needs Improvement</h4>
+                                                    <ul className="space-y-1">
+                                                        {summaryAnalysis.topNegativePoints.map((p, i) => (
+                                                            <li key={i} className="text-xs text-white/70 flex items-start gap-1">
+                                                                <span className="text-red-400 mt-0.5">•</span> {p}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Recommendations */}
+                                        {summaryAnalysis.recommendations?.length > 0 && (
+                                            <div className="p-3 rounded-xl mb-3" style={{ background: 'rgba(59, 130, 246, 0.06)', border: '1px solid rgba(59, 130, 246, 0.15)' }}>
+                                                <h4 className="text-xs font-semibold text-blue-400 mb-2">💡 AI Recommendations</h4>
+                                                <ul className="space-y-1">
+                                                    {summaryAnalysis.recommendations.map((r, i) => (
+                                                        <li key={i} className="text-xs text-white/70 flex items-start gap-1">
+                                                            <span className="text-blue-400 mt-0.5">{i + 1}.</span> {r}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* Individual Feedbacks */}
+                                        {summaryAnalysis.feedbacks?.length > 0 && (
+                                            <div className="p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                                                <h4 className="text-xs font-semibold text-white/70 mb-2">📝 Individual Reviews ({summaryAnalysis.feedbacks.length})</h4>
+                                                <div className="space-y-2 max-h-72 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                                                    {summaryAnalysis.feedbacks.map((fb, i) => (
+                                                        <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                                                            <span className={`text-sm mt-0.5 ${
+                                                                fb.sentiment === 'positive' ? 'text-green-400' :
+                                                                fb.sentiment === 'negative' ? 'text-red-400' : 'text-yellow-400'
+                                                            }`}>
+                                                                {fb.sentiment === 'positive' ? '👍' : fb.sentiment === 'negative' ? '👎' : '😐'}
+                                                            </span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-xs text-white/70 line-clamp-2">{fb.text || fb.summary}</p>
+                                                                <div className="flex gap-3 mt-1">
+                                                                    <span className={`text-xs ${
+                                                                        fb.sentiment === 'positive' ? 'text-green-400/70' :
+                                                                        fb.sentiment === 'negative' ? 'text-red-400/70' : 'text-yellow-400/70'
+                                                                    }`}>{fb.sentiment}</span>
+                                                                    {fb.rating && <span className="text-xs text-yellow-400/60">{'⭐'.repeat(fb.rating)}</span>}
+                                                                    {fb.confidence && <span className="text-xs text-white/30">{fb.confidence}% confidence</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Note if fallback was used */}
+                                        {summaryAnalysis.note && (
+                                            <p className="text-xs text-yellow-400/60 mt-3">{summaryAnalysis.note}</p>
+                                        )}
                                     </div>
                                 )}
-                            </div>
 
-                            {/* No platforms saved hint */}
-                            {savedPlatforms.length === 0 && !showManualInput && (
+                                {/* Summary Error */}
+                                {summaryError && (
+                                    <div className="p-3 rounded-xl mt-3" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                                        <p className="text-xs text-red-400">⚠️ {summaryError}</p>
+                                    </div>
+                                )}
+
                                 <p className="text-xs text-white/30 mt-3 text-center">
-                                    💡 Tip: Save your review platform links in <a href="/settings" className="text-purple-400 underline">Settings</a> → Review Platforms to see them here.
+                                    💡 Add more feedback summaries in <a href="/settings" className="text-purple-400 underline">Settings</a> → External Feedback Summaries
                                 </p>
-                            )}
-                        </div>
+                            </div>
+                        )}
 
                     </>
                 )}

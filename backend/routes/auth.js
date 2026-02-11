@@ -502,4 +502,62 @@ router.get('/verify-reset-token', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/auth/change-password
+ * Change password while logged in (requires current password)
+ */
+router.post('/change-password', authenticate, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const { userId } = req.user;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current password and new password are required' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        }
+
+        if (currentPassword === newPassword) {
+            return res.status(400).json({ error: 'New password must be different from current password' });
+        }
+
+        // Get user
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('password_hash')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify current password
+        const isValid = await bcrypt.compare(currentPassword, user.password_hash);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        // Hash new password
+        const newHash = await bcrypt.hash(newPassword, 10);
+
+        // Update password
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ password_hash: newHash })
+            .eq('id', userId);
+
+        if (updateError) {
+            return res.status(500).json({ error: 'Failed to update password' });
+        }
+
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        res.status(500).json({ error: 'Failed to change password' });
+    }
+});
+
 export default router;

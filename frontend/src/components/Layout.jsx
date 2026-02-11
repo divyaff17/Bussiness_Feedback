@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import API_URL from '../config/api'
 import LightRays from './LightRays'
+import FlyingButterfly from './FlyingButterfly'
+import CrackEffect from './CrackEffect'
 
 // Inject layout animations
 const LAYOUT_KEYFRAMES_ID = 'layout-keyframes';
@@ -81,21 +84,99 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             50% { opacity: 0.06; }
             100% { transform: translateX(100%); opacity: 0; }
         }
+        .nav-item-hover .nav-icon {
+            transition: transform 0.3s ease, filter 0.3s ease;
+        }
         .nav-item-hover:hover .nav-icon {
             animation: iconBounce 0.5s ease-in-out;
+            filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.7));
         }
         .nav-item-hover:hover {
-            animation: navItemFloat 0.5s ease-in-out;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.18) 0%, rgba(168, 85, 247, 0.14) 50%, rgba(236, 72, 153, 0.10) 100%) !important;
+            border-color: rgba(139, 92, 246, 0.35) !important;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+            color: #e0e7ff !important;
+            text-shadow: 0 0 12px rgba(165, 180, 252, 0.5);
+        }
+        @keyframes anchorSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes footerOrb1 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.15; }
+            33% { transform: translate(30px, -20px) scale(1.2); opacity: 0.25; }
+            66% { transform: translate(-20px, 15px) scale(0.9); opacity: 0.1; }
+        }
+        @keyframes footerOrb2 {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.1; }
+            50% { transform: translate(-40px, -10px) scale(1.3); opacity: 0.2; }
+        }
+        @keyframes footerShimmerLine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        @keyframes footerGlowPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.08), inset 0 1px 0 rgba(255,255,255,0.05); }
+            50% { box-shadow: 0 0 40px rgba(118, 75, 162, 0.12), inset 0 1px 0 rgba(255,255,255,0.1); }
+        }
+        @keyframes footerLinkGlow {
+            0%, 100% { text-shadow: 0 0 0px transparent; }
+            50% { text-shadow: 0 0 8px rgba(102, 126, 234, 0.5); }
+        }
+        .footer-link {
+            position: relative;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 6px rgba(255,255,255,0.15), 0 0 20px rgba(255,255,255,0.05);
+        }
+        .footer-link::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            width: 0;
+            height: 1px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+        .footer-link:hover::after {
+            width: 100%;
+        }
+        .footer-link:hover {
+            color: rgba(255,255,255,1) !important;
+            text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 30px rgba(102, 126, 234, 0.5);
         }
     `;
     document.head.appendChild(style);
 }
 
 export default function Layout({ children }) {
-    const { user, logout } = useAuth()
+    const { user, logout, getToken } = useAuth()
     const navigate = useNavigate()
     const [showProfileDropdown, setShowProfileDropdown] = useState(false)
     const profileDropdownRef = useRef(null)
+    const [newFeedbackCount, setNewFeedbackCount] = useState(0)
+
+    // Fetch new feedback count (last 24h unreplied)
+    useEffect(() => {
+        const fetchNewCount = async () => {
+            try {
+                const token = getToken?.()
+                if (!token || !user?.businessId) return
+                const res = await fetch(`${API_URL}/api/business/${user.businessId}/alerts`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    setNewFeedbackCount(data.unreadCount || 0)
+                }
+            } catch (err) { /* silent */ }
+        }
+        fetchNewCount()
+        const interval = setInterval(fetchNewCount, 30000) // every 30s
+        return () => clearInterval(interval)
+    }, [user?.businessId])
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -121,7 +202,7 @@ export default function Layout({ children }) {
     }
 
     const navItems = [
-        { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+        { path: '/dashboard', label: 'Dashboard', icon: '📊', badge: newFeedbackCount },
         { path: '/analytics', label: 'Analytics', icon: '📈' },
         { path: '/qr-code', label: 'QR Code', icon: '📱' },
         { path: '/pricing', label: 'Pricing', icon: '💎' },
@@ -147,16 +228,22 @@ export default function Layout({ children }) {
                     saturation={1}
                 />
             </div>
+
+            {/* Flying Butterflies */}
+            <FlyingButterfly />
+
+            {/* Crack Effect on Button Click */}
+            <CrackEffect />
             
             {/* Top Navigation - Glass Effect */}
             <nav 
                 className="fixed top-0 left-0 right-0 z-50"
                 style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)',
-                    backdropFilter: 'blur(20px)',
-                    WebkitBackdropFilter: 'blur(20px)',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3)',
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.1) 100%)',
+                    backdropFilter: 'blur(24px) saturate(1.5)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
+                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255,255,255,0.08) inset, 0 8px 32px rgba(102, 126, 234, 0.08)',
                     overflow: 'visible',
                 }}
             >
@@ -164,9 +251,16 @@ export default function Layout({ children }) {
                 <div 
                     className="absolute top-0 h-full w-1/3 pointer-events-none"
                     style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent)',
+                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent)',
                         animation: 'navbarShine 4s ease-in-out infinite',
                         zIndex: 0,
+                    }}
+                />
+                {/* Bottom glow line */}
+                <div 
+                    className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
+                    style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.4), rgba(118, 75, 162, 0.4), transparent)',
                     }}
                 />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative" style={{ overflow: 'visible', zIndex: 10 }}>
@@ -178,7 +272,7 @@ export default function Layout({ children }) {
                                 className="text-2xl"
                                 style={{
                                     filter: 'drop-shadow(0 0 8px rgba(102, 126, 234, 0.6))',
-                                    animation: 'logoGlow 2s ease-in-out infinite',
+                                    animation: 'anchorSpin 4s linear infinite',
                                     display: 'inline-block',
                                 }}
                             >
@@ -206,26 +300,40 @@ export default function Layout({ children }) {
                                     key={item.path}
                                     to={item.path}
                                     className={({ isActive }) =>
-                                        `nav-item-hover px-4 py-2 rounded-xl font-medium transition-all duration-300 flex items-center ${isActive
-                                            ? ''
-                                            : 'hover:bg-white/10'
-                                        }`
+                                        `nav-item-hover px-4 py-2 rounded-xl font-medium flex items-center ${isActive ? '' : ''}`
                                     }
                                     style={({ isActive }) => ({
+                                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                                         ...(isActive ? {
-                                            background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
-                                            border: '1px solid rgba(102, 126, 234, 0.4)',
-                                            color: '#a5b4fc',
-                                            animation: 'activeGlow 2s ease-in-out infinite',
+                                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(236, 72, 153, 0.18) 100%)',
+                                            border: '1px solid rgba(139, 92, 246, 0.5)',
+                                            color: '#e0e7ff',
+                                            boxShadow: '0 0 20px rgba(139, 92, 246, 0.25), 0 0 40px rgba(99, 102, 241, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                                            textShadow: '0 0 10px rgba(165, 180, 252, 0.5)',
                                         } : {
-                                            color: 'rgba(255, 255, 255, 0.7)',
+                                            color: 'rgba(255, 255, 255, 0.75)',
                                             border: '1px solid transparent',
+                                            textShadow: 'none',
                                         }),
                                         animationDelay: `${index * 0.1}s`,
                                     })}
                                 >
-                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1 }}>{item.icon}</span>
-                                    <span>{item.label}</span>
+                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1, filter: 'drop-shadow(0 0 3px rgba(165, 180, 252, 0.3))' }}>{item.icon}</span>
+                                    <span className="font-semibold tracking-wide relative" style={{ letterSpacing: '0.02em' }}>
+                                        {item.label}
+                                        {item.badge > 0 && (
+                                            <span 
+                                                className="absolute -top-2 -right-5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full text-[10px] font-bold text-white animate-pulse"
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #ef4444, #f87171)',
+                                                    boxShadow: '0 0 8px rgba(239, 68, 68, 0.6)',
+                                                    padding: '0 4px',
+                                                }}
+                                            >
+                                                {item.badge > 99 ? '99+' : item.badge}
+                                            </span>
+                                        )}
+                                    </span>
                                 </NavLink>
                             ))}
 
@@ -269,7 +377,7 @@ export default function Layout({ children }) {
                                             e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
                                         }}
                                     />
-                                    <span className="text-sm text-white/80 font-medium group-hover:text-white transition-colors duration-300">
+                                    <span className="text-sm text-white/90 font-semibold group-hover:text-white transition-colors duration-300">
                                         {user?.ownerName || user?.businessName}
                                     </span>
                                     <svg 
@@ -397,18 +505,32 @@ export default function Layout({ children }) {
                             <NavLink
                                 key={item.path}
                                 to={item.path}
-                                className="block px-4 py-3 rounded-xl font-medium transition-all"
+                                className="block px-4 py-3 rounded-xl font-medium transition-all duration-300"
                                 style={({ isActive }) => isActive ? {
-                                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
-                                    border: '1px solid rgba(102, 126, 234, 0.4)',
-                                    color: '#a5b4fc',
+                                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.2) 50%, rgba(236, 72, 153, 0.15) 100%)',
+                                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                                    color: '#e0e7ff',
+                                    boxShadow: '0 0 15px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
                                 } : {
                                     color: 'rgba(255, 255, 255, 0.7)',
-                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px solid transparent',
                                 }}
                             >
                                 <span className="mr-2">{item.icon}</span>
                                 {item.label}
+                                {item.badge > 0 && (
+                                    <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold"
+                                        style={{
+                                            background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                            color: 'white',
+                                            minWidth: '20px',
+                                            boxShadow: '0 0 8px rgba(239, 68, 68, 0.5)',
+                                        }}
+                                    >
+                                        {item.badge > 99 ? '99+' : item.badge}
+                                    </span>
+                                )}
                             </NavLink>
                         ))}
                         <button
@@ -452,11 +574,29 @@ export default function Layout({ children }) {
                         animation: 'logoShimmer 4s linear infinite',
                     }}
                 />
+                {/* Shimmer sweep */}
+                <div className="absolute top-0 left-0 right-0 h-px overflow-hidden">
+                    <div style={{ width: '50%', height: '100%', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)', animation: 'footerShimmerLine 3s ease-in-out infinite' }} />
+                </div>
+
+                {/* Subtle floating orbs */}
+                <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 70%)', animation: 'footerOrb1 12s ease-in-out infinite' }} />
+                <div className="absolute -bottom-12 right-10 w-52 h-52 rounded-full pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.03) 0%, transparent 70%)', animation: 'footerOrb2 10s ease-in-out infinite' }} />
+
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                         {/* Brand */}
                         <div className="flex flex-col items-center md:items-start gap-2">
                             <div className="flex items-center gap-2">
+                                <span
+                                    style={{
+                                        display: 'inline-block',
+                                        animation: 'anchorSpin 4s linear infinite',
+                                        fontSize: '1.35rem',
+                                    }}
+                                >
+                                    ⚓
+                                </span>
                                 <span 
                                     className="text-xl font-bold"
                                     style={{
@@ -468,33 +608,48 @@ export default function Layout({ children }) {
                                         animation: 'logoShimmer 3s linear infinite',
                                     }}
                                 >
-                                    ⚓ ReviewDock
+                                    ReviewDock
                                 </span>
                             </div>
-                            <p className="text-white/40 text-sm text-center md:text-left">
+                            <p 
+                                className="text-white/80 text-sm text-center md:text-left"
+                                style={{
+                                    textShadow: '0 0 8px rgba(255,255,255,0.2), 0 0 25px rgba(255,255,255,0.08)',
+                                }}
+                            >
                                 Smart review management for modern businesses
                             </p>
                         </div>
 
                         {/* Links */}
                         <div className="flex items-center gap-6 text-sm">
-                            <NavLink to="/dashboard" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                            <NavLink to="/dashboard" className="footer-link text-white/80">
                                 Dashboard
                             </NavLink>
-                            <NavLink to="/analytics" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                            <NavLink to="/analytics" className="footer-link text-white/80">
                                 Analytics
                             </NavLink>
-                            <NavLink to="/pricing" className="text-white/50 hover:text-white/90 transition-colors duration-300">
+                            <NavLink to="/pricing" className="footer-link text-white/80">
                                 Pricing
                             </NavLink>
                         </div>
 
                         {/* Copyright */}
                         <div className="text-center md:text-right">
-                            <p className="text-white/30 text-xs">
+                            <p 
+                                className="text-white/70 text-xs"
+                                style={{
+                                    textShadow: '0 0 6px rgba(255,255,255,0.15), 0 0 20px rgba(255,255,255,0.06)',
+                                }}
+                            >
                                 © {new Date().getFullYear()} ReviewDock. All rights reserved.
                             </p>
-                            <p className="text-white/20 text-xs mt-1">
+                            <p 
+                                className="text-white/60 text-xs mt-1"
+                                style={{
+                                    textShadow: '0 0 8px rgba(255,255,255,0.2), 0 0 25px rgba(255,255,255,0.08)',
+                                }}
+                            >
                                 Built with 💜 for businesses that care
                             </p>
                         </div>

@@ -9,6 +9,7 @@ export default function Feedback() {
     const [loading, setLoading] = useState(true)
     const [rating, setRating] = useState(0)
     const [message, setMessage] = useState('')
+    const [customerEmail, setCustomerEmail] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [submitted, setSubmitted] = useState(false)
     const [result, setResult] = useState(null)
@@ -71,7 +72,8 @@ export default function Feedback() {
                 },
                 body: JSON.stringify({
                     rating,
-                    message: message.trim()
+                    message: message.trim(),
+                    customerEmail: customerEmail.trim() || undefined
                 })
             })
 
@@ -220,6 +222,24 @@ export default function Feedback() {
                                 className="input min-h-[100px] resize-none"
                                 disabled={submitting}
                             />
+                        </div>
+                    )}
+
+                    {/* Optional email field */}
+                    {rating > 0 && (
+                        <div className="mb-6 animate-fadeIn">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Your email <span className="text-gray-400">(optional — to receive a response)</span>
+                            </label>
+                            <input
+                                type="email"
+                                value={customerEmail}
+                                onChange={(e) => setCustomerEmail(e.target.value)}
+                                placeholder="you@example.com"
+                                className="input"
+                                disabled={submitting}
+                            />
+                            <p className="text-xs text-gray-400 mt-1">We'll only use this to respond to your feedback.</p>
                         </div>
                     )}
 

@@ -587,6 +587,200 @@ function fallbackBulkAnalysis(feedbacks) {
     };
 }
 
+/**
+ * Analyze a bulk summary (Google Form responses, Google Reviews, etc.)
+ * with maximum accuracy — splits into individual reviews and analyzes each
+ * Returns comprehensive analysis with per-review breakdown
+ */
+export async function analyzeBulkSummary(text, sourceType = 'other') {
+    if (!text || text.trim().length === 0) {
+        return {
+            overallSentiment: 'neutral',
+            overallScore: 0,
+            overallSummary: 'No text provided for analysis',
+            totalFound: 0,
+            positiveCount: 0,
+            negativeCount: 0,
+            feedbacks: [],
+            topPositivePoints: [],
+            topNegativePoints: [],
+            recommendations: [],
+            accuracy: 0
+        };
+    }
+
+    const sourceLabel = {
+        'google_form': 'Google Form responses',
+        'google_review': 'Google Reviews',
+        'survey': 'Survey responses',
+        'email': 'Email feedback',
+        'other': 'External feedback'
+    }[sourceType] || 'External feedback';
+
+    try {
+        const prompt = `You are an expert feedback analysis AI specializing in extracting and analyzing customer feedback from ${sourceLabel}. 
+
+Below is raw text content that a business owner has pasted. It may contain:
+- Multiple individual reviews/responses
+- Star ratings (1-5 stars, ★, or numeric ratings)
+- Mixed formatting (numbered lists, paragraphs, form responses)
+- Survey question-answer pairs
+
+Your job is to provide the MOST ACCURATE analysis possible:
+
+1. Identify and extract EVERY individual piece of feedback/review/response
+2. For each one, determine sentiment (positive/negative/neutral) and estimate a star rating
+3. Look for star ratings mentioned in text (e.g., "4/5", "★★★★", "4 stars", "rated 3")
+4. Analyze the overall text written alongside ratings to determine true sentiment
+5. Provide an overall assessment with maximum accuracy
+
+Pasted content:
+"""
+${text.substring(0, 12000)}
+"""
+
+Respond ONLY with valid JSON (no markdown, no code blocks):
+{
+  "overallSentiment": "positive" or "negative" or "mixed" or "neutral",
+  "overallScore": number 0-100 (accuracy-weighted score),
+  "overallSummary": "3-4 sentence comprehensive summary of ALL the feedback",
+  "totalFound": number of individual feedbacks identified,
+  "positiveCount": number of positive feedbacks,
+  "negativeCount": number of negative feedbacks,
+  "neutralCount": number of neutral feedbacks,
+  "averageRating": number 1.0-5.0 (estimated average star rating),
+  "feedbacks": [
+    {
+      "text": "the extracted feedback text (max 200 chars)",
+      "sentiment": "positive" or "negative" or "neutral",
+      "rating": number 1-5,
+      "confidence": number 0-100,
+      "summary": "one line summary"
+    }
+  ],
+  "topPositivePoints": ["strength 1", "strength 2", "strength 3"],
+  "topNegativePoints": ["weakness 1", "weakness 2"],
+  "recommendations": ["actionable recommendation 1", "recommendation 2", "recommendation 3"],
+  "sentimentDistribution": {
+    "veryPositive": number (5 stars),
+    "positive": number (4 stars),
+    "neutral": number (3 stars),
+    "negative": number (2 stars),
+    "veryNegative": number (1 star)
+  },
+  "keyThemes": ["theme1", "theme2", "theme3"],
+  "accuracy": number 70-99 (your confidence in this analysis)
+}
+
+If you find star ratings in the text, prioritize those for accuracy. If only text is available, infer ratings from sentiment intensity. Be thorough — find EVERY review/response.`;
+
+        const geminiResult = await callGeminiWithRetry(prompt, 3000, 3);
+
+        if (!geminiResult.ok || !geminiResult.text) {
+            console.log('[AI] Gemini unavailable for bulk summary, using enhanced fallback');
+            return fallbackBulkSummaryAnalysis(text, sourceType);
+        }
+
+        const cleanText = geminiResult.text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        const result = JSON.parse(cleanText);
+
+        return {
+            overallSentiment: result.overallSentiment || 'neutral',
+            overallScore: result.overallScore || 50,
+            overallSummary: result.overallSummary || 'Analysis complete',
+            totalFound: result.totalFound || 0,
+            positiveCount: result.positiveCount || 0,
+            negativeCount: result.negativeCount || 0,
+            neutralCount: result.neutralCount || 0,
+            averageRating: result.averageRating || 3,
+            feedbacks: (result.feedbacks || []).slice(0, 50),
+            topPositivePoints: result.topPositivePoints || [],
+            topNegativePoints: result.topNegativePoints || [],
+            recommendations: result.recommendations || [],
+            sentimentDistribution: result.sentimentDistribution || {},
+            keyThemes: result.keyThemes || [],
+            accuracy: result.accuracy || 75
+        };
+    } catch (error) {
+        console.error('Bulk summary analysis error:', error);
+        return fallbackBulkSummaryAnalysis(text, sourceType);
+    }
+}
+
+/**
+ * Fallback analysis for bulk summaries when AI is unavailable
+ */
+function fallbackBulkSummaryAnalysis(text, sourceType) {
+    const reviews = splitIntoReviews(text);
+    const totalReviews = reviews.length;
+    
+    let positiveCount = 0;
+    let negativeCount = 0;
+    let neutralCount = 0;
+    let totalRating = 0;
+    const feedbacks = [];
+    const posPoints = [];
+    const negPoints = [];
+
+    for (const review of reviews) {
+        const { posScore, negScore } = scoreSentiment(review);
+        let sentiment, rating;
+
+        if (posScore > negScore) {
+            sentiment = 'positive';
+            positiveCount++;
+            rating = Math.min(5, 3 + Math.floor(posScore / 2));
+            if (posPoints.length < 3) posPoints.push(review.substring(0, 80));
+        } else if (negScore > posScore) {
+            sentiment = 'negative';
+            negativeCount++;
+            rating = Math.max(1, 3 - Math.floor(negScore / 2));
+            if (negPoints.length < 3) negPoints.push(review.substring(0, 80));
+        } else {
+            sentiment = 'neutral';
+            neutralCount++;
+            rating = 3;
+        }
+
+        totalRating += rating;
+        feedbacks.push({
+            text: review.substring(0, 200),
+            sentiment,
+            rating,
+            confidence: Math.min(65, 30 + (posScore + negScore) * 5),
+            summary: review.substring(0, 80)
+        });
+    }
+
+    const avgRating = totalReviews > 0 ? Math.round((totalRating / totalReviews) * 10) / 10 : 3;
+    const overallScore = totalReviews > 0 ? Math.round((positiveCount / totalReviews) * 100) : 50;
+
+    return {
+        overallSentiment: positiveCount > negativeCount ? 'positive' : (negativeCount > positiveCount ? 'negative' : 'mixed'),
+        overallScore,
+        overallSummary: `Analyzed ${totalReviews} reviews: ${positiveCount} positive, ${negativeCount} negative, ${neutralCount} neutral. Average rating: ${avgRating}/5. (Keyword-based analysis — AI temporarily unavailable)`,
+        totalFound: totalReviews,
+        positiveCount,
+        negativeCount,
+        neutralCount,
+        averageRating: avgRating,
+        feedbacks: feedbacks.slice(0, 50),
+        topPositivePoints: posPoints.length > 0 ? posPoints : ['No strongly positive points detected'],
+        topNegativePoints: negPoints.length > 0 ? negPoints : ['No strongly negative points detected'],
+        recommendations: ['For more accurate analysis, try again when AI service is available'],
+        sentimentDistribution: {
+            veryPositive: feedbacks.filter(f => f.rating === 5).length,
+            positive: feedbacks.filter(f => f.rating === 4).length,
+            neutral: feedbacks.filter(f => f.rating === 3).length,
+            negative: feedbacks.filter(f => f.rating === 2).length,
+            veryNegative: feedbacks.filter(f => f.rating === 1).length,
+        },
+        keyThemes: [],
+        accuracy: 45,
+        note: '⚠️ AI service temporarily unavailable — using keyword-based analysis'
+    };
+}
+
 function fallbackExternalAnalysis(text) {
     console.log('[Fallback] Analyzing external feedback with enhanced keyword analysis...');
 

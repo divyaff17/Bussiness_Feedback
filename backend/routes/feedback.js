@@ -4,6 +4,7 @@ import { supabase } from '../db/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { feedbackLimiter } from '../middleware/rateLimit.js';
 import { analyzeFeedback, analyzeBulkFeedback, analyzeExternalFeedback, fetchAndAnalyzeUrl } from '../services/ai.js';
+import { sendNegativeFeedbackAlert, sendReplyToCustomer } from '../services/email.js';
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ const router = express.Router();
 router.post('/:businessId', feedbackLimiter, async (req, res) => {
     try {
         const { businessId } = req.params;
-        const { rating, message } = req.body;
+        const { rating, message, customerEmail } = req.body;
 
         // Validate rating
         if (!rating || rating < 1 || rating > 5) {
@@ -103,6 +104,7 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
                 business_id: businessId,
                 rating: parseInt(rating),
                 message: message || null,
+                customer_email: customerEmail && customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
                 is_positive: isPositive,
                 ai_sentiment: aiSentiment,
                 ai_confidence: aiConfidence,
@@ -120,6 +122,27 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
             .from('businesses')
             .update({ monthly_feedback_count: (business.monthly_feedback_count || 0) + 1 })
             .eq('id', businessId);
+
+        // Send email alert for negative feedback (non-blocking)
+        if (!isPositive) {
+            try {
+                const { data: businessDetails } = await supabase
+                    .from('businesses')
+                    .select('name, owner_email')
+                    .eq('id', businessId)
+                    .single();
+
+                if (businessDetails?.owner_email) {
+                    sendNegativeFeedbackAlert(
+                        businessDetails.owner_email,
+                        businessDetails.name || 'Your Business',
+                        { message: message || '', rating, sentiment: aiSentiment }
+                    ).catch(err => console.error('[Email] Alert failed:', err.message));
+                }
+            } catch (emailErr) {
+                console.error('[Email] Failed to send negative feedback alert:', emailErr.message);
+            }
+        }
 
         // Get primary review platform URL (with fallback to legacy google_review_url)
         let reviewUrl = business.google_review_url
@@ -200,7 +223,13 @@ router.get('/:businessId', authenticate, async (req, res) => {
             return res.status(500).json({ error: 'Failed to get feedbacks' });
         }
 
-        res.json({ feedbacks: feedbacks || [] });
+        // Strip customer_email for privacy but indicate if one exists
+        const sanitized = (feedbacks || []).map(fb => {
+            const { customer_email, ...rest } = fb;
+            return { ...rest, has_email: !!customer_email };
+        });
+
+        res.json({ feedbacks: sanitized });
     } catch (error) {
         console.error('Get feedbacks error:', error);
         res.status(500).json({ error: 'Failed to get feedbacks' });
@@ -401,6 +430,218 @@ router.post('/:businessId/analyze-url', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Analyze URL error:', error);
         res.status(500).json({ error: 'Failed to analyze URL' });
+    }
+});
+
+/**
+ * POST /api/feedback/:businessId/:feedbackId/reply
+ * Reply to a feedback (business owner)
+ */
+router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => {
+    try {
+        const { businessId, feedbackId } = req.params;
+        const { businessId: userBusinessId } = req.user;
+        const { reply } = req.body;
+
+        if (businessId !== userBusinessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (!reply || reply.trim().length === 0) {
+            return res.status(400).json({ error: 'Reply text is required' });
+        }
+
+        const { data, error } = await supabase
+            .from('feedbacks')
+            .update({ 
+                owner_reply: reply.trim(), 
+                replied_at: new Date().toISOString() 
+            })
+            .eq('id', feedbackId)
+            .eq('business_id', businessId)
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Reply error:', error);
+            return res.status(500).json({ error: 'Failed to save reply' });
+        }
+
+        // Send reply email to customer if they provided an email
+        let emailSent = false;
+        if (data?.customer_email) {
+            try {
+                // Get business name for the email
+                const { data: biz } = await supabase
+                    .from('businesses')
+                    .select('name')
+                    .eq('id', businessId)
+                    .single();
+
+                const result = await sendReplyToCustomer(
+                    data.customer_email,
+                    biz?.name || 'The Business',
+                    {
+                        originalMessage: data.message || '',
+                        originalRating: data.rating,
+                        replyText: reply.trim()
+                    }
+                );
+                emailSent = result.success;
+                console.log(`[Email] Reply sent to customer ${data.customer_email}: ${emailSent}`);
+            } catch (emailErr) {
+                console.error('[Email] Failed to send reply to customer:', emailErr.message);
+            }
+        }
+
+        res.json({ message: 'Reply saved', feedback: data, emailSent });
+    } catch (error) {
+        console.error('Reply error:', error);
+        res.status(500).json({ error: 'Failed to save reply' });
+    }
+});
+
+/**
+ * DELETE /api/feedback/:businessId/:feedbackId
+ * Delete a feedback entry
+ */
+router.delete('/:businessId/:feedbackId', authenticate, async (req, res) => {
+    try {
+        const { businessId, feedbackId } = req.params;
+        const { businessId: userBusinessId } = req.user;
+
+        if (businessId !== userBusinessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { error } = await supabase
+            .from('feedbacks')
+            .delete()
+            .eq('id', feedbackId)
+            .eq('business_id', businessId);
+
+        if (error) {
+            console.error('Delete feedback error:', error);
+            return res.status(500).json({ error: 'Failed to delete feedback' });
+        }
+
+        res.json({ message: 'Feedback deleted' });
+    } catch (error) {
+        console.error('Delete feedback error:', error);
+        res.status(500).json({ error: 'Failed to delete feedback' });
+    }
+});
+
+/**
+ * PATCH /api/feedback/:businessId/:feedbackId/pin
+ * Toggle pin/bookmark on a feedback
+ */
+router.patch('/:businessId/:feedbackId/pin', authenticate, async (req, res) => {
+    try {
+        const { businessId, feedbackId } = req.params;
+        const { businessId: userBusinessId } = req.user;
+
+        if (businessId !== userBusinessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Get current pin state
+        const { data: feedback, error: fetchError } = await supabase
+            .from('feedbacks')
+            .select('is_pinned')
+            .eq('id', feedbackId)
+            .eq('business_id', businessId)
+            .single();
+
+        if (fetchError || !feedback) {
+            return res.status(404).json({ error: 'Feedback not found' });
+        }
+
+        const newPinState = !feedback.is_pinned;
+
+        const { error: updateError } = await supabase
+            .from('feedbacks')
+            .update({ is_pinned: newPinState })
+            .eq('id', feedbackId)
+            .eq('business_id', businessId);
+
+        if (updateError) {
+            return res.status(500).json({ error: 'Failed to update pin status' });
+        }
+
+        res.json({ message: newPinState ? 'Feedback pinned' : 'Feedback unpinned', is_pinned: newPinState });
+    } catch (error) {
+        console.error('Pin feedback error:', error);
+        res.status(500).json({ error: 'Failed to pin feedback' });
+    }
+});
+
+/**
+ * GET /api/feedback/:businessId/export
+ * Export feedbacks as CSV
+ */
+router.get('/:businessId/export', authenticate, async (req, res) => {
+    try {
+        const { businessId } = req.params;
+        const { businessId: userBusinessId } = req.user;
+        const { filter, type } = req.query;
+
+        if (businessId !== userBusinessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        let query = supabase
+            .from('feedbacks')
+            .select('*')
+            .eq('business_id', businessId)
+            .order('created_at', { ascending: false });
+
+        // Apply date filter
+        const now = new Date();
+        if (filter === 'today') {
+            query = query.gte('created_at', now.toISOString().split('T')[0]);
+        } else if (filter === 'week') {
+            query = query.gte('created_at', new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        } else if (filter === 'month') {
+            query = query.gte('created_at', new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+        } else if (filter === 'year') {
+            query = query.gte('created_at', new Date(now.getFullYear(), 0, 1).toISOString());
+        }
+
+        if (type === 'negative') query = query.eq('is_positive', false);
+        else if (type === 'positive') query = query.eq('is_positive', true);
+
+        const { data: feedbacks, error } = await query.limit(5000);
+
+        if (error) {
+            return res.status(500).json({ error: 'Failed to export feedbacks' });
+        }
+
+        // Build CSV
+        const headers = ['Date', 'Time', 'Rating', 'Sentiment', 'Message', 'AI Sentiment', 'AI Confidence', 'Owner Reply', 'Reply Date'];
+        const rows = (feedbacks || []).map(fb => {
+            const date = fb.created_at ? new Date(fb.created_at) : null;
+            return [
+                date ? date.toLocaleDateString() : '',
+                date ? date.toLocaleTimeString() : '',
+                fb.rating != null ? fb.rating : '',
+                fb.is_positive ? 'Positive' : 'Negative',
+                `"${(fb.message || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+                fb.ai_sentiment || '',
+                fb.ai_confidence != null ? fb.ai_confidence : '',
+                `"${(fb.owner_reply || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+                fb.replied_at ? new Date(fb.replied_at).toLocaleDateString() : ''
+            ].join(',');
+        });
+
+        const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=feedbacks_${new Date().toISOString().split('T')[0]}.csv`);
+        res.send(csv);
+    } catch (error) {
+        console.error('Export error:', error);
+        res.status(500).json({ error: 'Failed to export feedbacks' });
     }
 });
 

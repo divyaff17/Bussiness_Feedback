@@ -478,28 +478,38 @@ export default function QRCode() {
                                 </div>
                             </div>
 
-                            {/* Download Selected Style */}
+                            {/* Print All QR */}
                             <div className="flex justify-center">
                                 <button
-                                    onClick={() => downloadQR(selectedStyle)}
-                                    disabled={downloading}
+                                    onClick={() => {
+                                        const printWindow = window.open('', '_blank')
+                                        if (!printWindow) return
+                                        const qrImages = QR_STYLES.map((style) => {
+                                            const container = qrRefs.current[style.id]
+                                            const canvas = container?.querySelector('canvas')
+                                            if (canvas) {
+                                                return `<div style="text-align:center;page-break-inside:avoid;margin-bottom:24px;">
+                                                    <h2 style="margin:0 0 8px;font-size:18px;">${style.name}</h2>
+                                                    <img src="${canvas.toDataURL('image/png')}" style="width:250px;height:250px;" />
+                                                    <p style="margin:4px 0 0;font-size:12px;color:#666;">${style.description}</p>
+                                                </div>`
+                                            }
+                                            return ''
+                                        }).join('')
+                                        printWindow.document.write(`<!DOCTYPE html><html><head><title>Print All QR Codes</title><style>body{font-family:Arial,sans-serif;display:flex;flex-wrap:wrap;justify-content:center;gap:32px;padding:24px;}@media print{body{gap:24px;}}</style></head><body>${qrImages}</body></html>`)
+                                        printWindow.document.close()
+                                        printWindow.focus()
+                                        printWindow.print()
+                                    }}
                                     className="text-lg px-8 py-4 rounded-xl font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                                     style={{
                                         background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%)',
                                         border: '1px solid rgba(102, 126, 234, 0.5)',
                                         color: 'white',
                                         boxShadow: '0 0 30px rgba(102, 126, 234, 0.3)',
-                                        opacity: downloading ? 0.7 : 1,
                                     }}
                                 >
-                                    {downloading ? (
-                                        <span className="flex items-center gap-2">
-                                            <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
-                                            Preparing...
-                                        </span>
-                                    ) : (
-                                        `📥 Download "${QR_STYLES.find(s => s.id === selectedStyle)?.name}" QR`
-                                    )}
+                                    🖨️ Print All QR
                                 </button>
                             </div>
 

@@ -1,7 +1,9 @@
 import express from 'express';
 import QRCode from 'qrcode';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../db/supabase.js';
 import { authenticate } from '../middleware/auth.js';
+import { analyzeBulkSummary } from '../services/ai.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -598,27 +600,35 @@ router.get('/:id/stats', authenticate, async (req, res) => {
 
         // Build date filter
         let dateFilter = null;
+        let prevDateFilter = null;
         const now = new Date();
 
         if (filter === 'today') {
-            const today = now.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
+            const today = now.toISOString().split('T')[0];
             dateFilter = today;
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            prevDateFilter = { start: yesterday.toISOString().split('T')[0], end: today };
         } else if (filter === 'week') {
             const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             dateFilter = weekAgo.toISOString();
+            const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+            prevDateFilter = { start: twoWeeksAgo.toISOString(), end: weekAgo.toISOString() };
         } else if (filter === 'month') {
             const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
             dateFilter = monthAgo.toISOString();
+            const twoMonthsAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+            prevDateFilter = { start: twoMonthsAgo.toISOString(), end: monthAgo.toISOString() };
         } else if (filter === 'year') {
             const startOfYear = new Date(now.getFullYear(), 0, 1);
             dateFilter = startOfYear.toISOString();
+            const startOfLastYear = new Date(now.getFullYear() - 1, 0, 1);
+            prevDateFilter = { start: startOfLastYear.toISOString(), end: startOfYear.toISOString() };
         }
-        // filter === 'all' or undefined → no dateFilter → fetch everything
 
-        // Build query — fetch rating too for avgRating calculation
+        // Build query — fetch rating, is_positive, reply info
         let query = supabase
             .from('feedbacks')
-            .select('rating, is_positive, sentiment_mismatch')
+            .select('rating, is_positive, owner_reply, replied_at, created_at')
             .eq('business_id', id);
 
         if (dateFilter) {
@@ -634,13 +644,89 @@ router.get('/:id/stats', authenticate, async (req, res) => {
         const total = feedbacks?.length || 0;
         const positive = feedbacks?.filter(f => f.is_positive).length || 0;
         const negative = total - positive;
-        const mismatches = feedbacks?.filter(f => f.sentiment_mismatch).length || 0;
         const avgRating = total > 0
             ? parseFloat((feedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / total).toFixed(1))
             : 0;
         const positiveRate = total > 0 ? Math.round((positive / total) * 100) : 0;
 
-        res.json({ total, positive, negative, mismatches, avgRating, positiveRate });
+        // NPS Score: Promoters (4-5) - Detractors (1-2), Passives (3) ignored
+        const promoters = feedbacks?.filter(f => f.rating >= 4).length || 0;
+        const detractors = feedbacks?.filter(f => f.rating <= 2).length || 0;
+        const npsScore = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
+
+        // Response Rate: % of feedbacks with owner_reply
+        const replied = feedbacks?.filter(f => f.owner_reply).length || 0;
+        const responseRate = total > 0 ? Math.round((replied / total) * 100) : 0;
+
+        // Average response time (hours) for replied feedbacks
+        let avgResponseTime = null;
+        const repliedFeedbacks = feedbacks?.filter(f => f.owner_reply && f.replied_at && f.created_at) || [];
+        if (repliedFeedbacks.length > 0) {
+            const totalHours = repliedFeedbacks.reduce((sum, f) => {
+                const diff = new Date(f.replied_at) - new Date(f.created_at);
+                return sum + (diff / (1000 * 60 * 60));
+            }, 0);
+            avgResponseTime = parseFloat((totalHours / repliedFeedbacks.length).toFixed(1));
+        }
+
+        // Rating distribution (1-5 stars)
+        const ratingDistribution = [1, 2, 3, 4, 5].map(star => ({
+            star,
+            count: feedbacks?.filter(f => f.rating === star).length || 0,
+            percentage: total > 0 ? Math.round((feedbacks?.filter(f => f.rating === star).length || 0) / total * 100) : 0
+        }));
+
+        // Period comparison - fetch previous period data
+        let comparison = null;
+        if (prevDateFilter) {
+            let prevQuery = supabase
+                .from('feedbacks')
+                .select('rating, is_positive')
+                .eq('business_id', id)
+                .gte('created_at', prevDateFilter.start)
+                .lt('created_at', prevDateFilter.end);
+
+            const { data: prevFeedbacks } = await prevQuery;
+            const prevTotal = prevFeedbacks?.length || 0;
+            const prevPositive = prevFeedbacks?.filter(f => f.is_positive).length || 0;
+            const prevNegative = prevTotal - prevPositive;
+            const prevAvgRating = prevTotal > 0
+                ? parseFloat((prevFeedbacks.reduce((sum, f) => sum + (f.rating || 0), 0) / prevTotal).toFixed(1))
+                : 0;
+
+            comparison = {
+                totalChange: prevTotal > 0 ? Math.round(((total - prevTotal) / prevTotal) * 100) : (total > 0 ? 100 : 0),
+                positiveChange: prevPositive > 0 ? Math.round(((positive - prevPositive) / prevPositive) * 100) : (positive > 0 ? 100 : 0),
+                negativeChange: prevNegative > 0 ? Math.round(((negative - prevNegative) / prevNegative) * 100) : (negative > 0 ? 100 : 0),
+                ratingChange: prevAvgRating > 0 ? parseFloat((avgRating - prevAvgRating).toFixed(1)) : 0,
+            };
+        }
+
+        // Top keywords from feedback messages
+        const stopWords = new Set(['the', 'is', 'at', 'in', 'it', 'a', 'an', 'and', 'or', 'to', 'of', 'for', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'shall', 'not', 'but', 'if', 'they', 'them', 'their', 'this', 'that', 'these', 'those', 'my', 'your', 'his', 'her', 'its', 'our', 'we', 'you', 'i', 'me', 'he', 'she', 'with', 'on', 'from', 'by', 'are', 'am', 'so', 'very', 'just', 'all', 'no', 'yes', 'also', 'too', 'more', 'much', 'than', 'then', 'about', 'up', 'out', 'what', 'which', 'who', 'when', 'where', 'how', 'here', 'there', 'really', 'get', 'got', 'us']);
+        const wordCounts = {};
+        (feedbacks || []).forEach(f => {
+            if (f.message) {
+                f.message.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).forEach(word => {
+                    if (word.length > 2 && !stopWords.has(word)) {
+                        wordCounts[word] = (wordCounts[word] || 0) + 1;
+                    }
+                });
+            }
+        });
+        // Only words mentioned more than once
+        const topKeywords = Object.entries(wordCounts)
+            .filter(([_, count]) => count > 1)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 15)
+            .map(([word, count]) => ({ word, count }));
+
+        res.json({
+            total, positive, negative, avgRating, positiveRate,
+            npsScore, responseRate, avgResponseTime,
+            ratingDistribution, comparison, topKeywords,
+            replied, totalWithMessages: feedbacks?.filter(f => f.message).length || 0
+        });
     } catch (error) {
         console.error('Stats error:', error);
         res.status(500).json({ error: 'Failed to get statistics' });
@@ -939,6 +1025,239 @@ router.get('/:id/analytics', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Analytics error:', error);
         res.status(500).json({ error: 'Failed to get analytics data' });
+    }
+});
+
+// ==================== EXTERNAL FEEDBACK SUMMARIES ====================
+
+/**
+ * POST /api/business/:id/external-summaries
+ * Save an external feedback summary (Google Form, Google Review, etc.)
+ */
+router.post('/:id/external-summaries', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { businessId } = req.user;
+        const { sourceType, title, rawText } = req.body;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        if (!rawText || rawText.trim().length === 0) {
+            return res.status(400).json({ error: 'Feedback text is required' });
+        }
+
+        const summaryId = uuidv4();
+        const { error: insertError } = await supabase
+            .from('external_summaries')
+            .insert({
+                id: summaryId,
+                business_id: id,
+                source_type: sourceType || 'other',
+                title: title || `${sourceType || 'External'} Feedback - ${new Date().toLocaleDateString()}`,
+                raw_text: rawText.trim(),
+                is_analyzed: false
+            });
+
+        if (insertError) {
+            console.error('Insert external summary error:', insertError);
+            return res.status(500).json({ error: 'Failed to save summary. Please ensure the external_summaries table exists.' });
+        }
+
+        res.status(201).json({
+            message: 'Summary saved successfully',
+            summary: {
+                id: summaryId,
+                source_type: sourceType || 'other',
+                title: title || `${sourceType || 'External'} Feedback`,
+                is_analyzed: false
+            }
+        });
+    } catch (error) {
+        console.error('Save external summary error:', error);
+        res.status(500).json({ error: 'Failed to save summary' });
+    }
+});
+
+/**
+ * GET /api/business/:id/external-summaries
+ * Get all saved external summaries for a business
+ */
+router.get('/:id/external-summaries', authenticate, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { data: summaries, error } = await supabase
+            .from('external_summaries')
+            .select('id, source_type, title, overall_sentiment, overall_score, positive_count, negative_count, total_reviews_found, is_analyzed, analyzed_at, created_at')
+            .eq('business_id', id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Fetch summaries error:', error);
+            return res.status(500).json({ error: 'Failed to fetch summaries' });
+        }
+
+        res.json({ summaries: summaries || [] });
+    } catch (error) {
+        console.error('Get summaries error:', error);
+        res.status(500).json({ error: 'Failed to fetch summaries' });
+    }
+});
+
+/**
+ * GET /api/business/:id/external-summaries/:summaryId
+ * Get a single summary with full analysis result
+ */
+router.get('/:id/external-summaries/:summaryId', authenticate, async (req, res) => {
+    try {
+        const { id, summaryId } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { data: summary, error } = await supabase
+            .from('external_summaries')
+            .select('*')
+            .eq('id', summaryId)
+            .eq('business_id', id)
+            .single();
+
+        if (error || !summary) {
+            return res.status(404).json({ error: 'Summary not found' });
+        }
+
+        res.json({ summary });
+    } catch (error) {
+        console.error('Get summary error:', error);
+        res.status(500).json({ error: 'Failed to fetch summary' });
+    }
+});
+
+/**
+ * POST /api/business/:id/external-summaries/:summaryId/analyze
+ * Analyze a saved summary with AI (can re-analyze)
+ */
+router.post('/:id/external-summaries/:summaryId/analyze', authenticate, async (req, res) => {
+    try {
+        const { id, summaryId } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Fetch the summary
+        const { data: summary, error: fetchError } = await supabase
+            .from('external_summaries')
+            .select('*')
+            .eq('id', summaryId)
+            .eq('business_id', id)
+            .single();
+
+        if (fetchError || !summary) {
+            return res.status(404).json({ error: 'Summary not found' });
+        }
+
+        console.log(`[analyze-summary] Analyzing summary ${summaryId} (${summary.source_type})...`);
+
+        // Run AI analysis
+        const analysis = await analyzeBulkSummary(summary.raw_text, summary.source_type);
+
+        // Update the summary with analysis results
+        const { error: updateError } = await supabase
+            .from('external_summaries')
+            .update({
+                analysis_result: analysis,
+                overall_sentiment: analysis.overallSentiment,
+                overall_score: analysis.overallScore,
+                positive_count: analysis.positiveCount,
+                negative_count: analysis.negativeCount,
+                total_reviews_found: analysis.totalFound,
+                is_analyzed: true,
+                analyzed_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', summaryId);
+
+        if (updateError) {
+            console.error('Update summary error:', updateError);
+        }
+
+        // Also save individual feedbacks to the main feedbacks table
+        let savedCount = 0;
+        if (analysis.feedbacks && analysis.feedbacks.length > 0) {
+            for (const fb of analysis.feedbacks) {
+                const feedbackId = uuidv4();
+                const rating = Math.min(5, Math.max(1, fb.rating || 3));
+                const isPositive = fb.sentiment === 'positive' || rating >= 4;
+
+                const { error: insertError } = await supabase
+                    .from('feedbacks')
+                    .insert({
+                        id: feedbackId,
+                        business_id: id,
+                        rating: rating,
+                        message: fb.text || fb.summary || 'External feedback',
+                        is_positive: isPositive,
+                        notified: false,
+                        source: summary.source_type || 'external',
+                        ai_sentiment: fb.sentiment,
+                        ai_confidence: fb.confidence
+                    });
+
+                if (!insertError) savedCount++;
+            }
+        }
+
+        console.log(`[analyze-summary] Analysis complete. Found ${analysis.totalFound} feedbacks, saved ${savedCount} to dashboard.`);
+
+        res.json({
+            message: 'Analysis complete',
+            analysis,
+            savedCount
+        });
+    } catch (error) {
+        console.error('Analyze summary error:', error);
+        res.status(500).json({ error: 'Failed to analyze summary' });
+    }
+});
+
+/**
+ * DELETE /api/business/:id/external-summaries/:summaryId
+ * Delete a saved summary
+ */
+router.delete('/:id/external-summaries/:summaryId', authenticate, async (req, res) => {
+    try {
+        const { id, summaryId } = req.params;
+        const { businessId } = req.user;
+
+        if (id !== businessId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { error } = await supabase
+            .from('external_summaries')
+            .delete()
+            .eq('id', summaryId)
+            .eq('business_id', id);
+
+        if (error) {
+            return res.status(500).json({ error: 'Failed to delete summary' });
+        }
+
+        res.json({ message: 'Summary deleted' });
+    } catch (error) {
+        console.error('Delete summary error:', error);
+        res.status(500).json({ error: 'Failed to delete summary' });
     }
 });
 
