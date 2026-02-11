@@ -269,7 +269,7 @@ export default function Dashboard() {
                 setReplyText('')
                 fetchData(false)
                 if (data.emailSent) {
-                    alert('✅ Reply saved & emailed to customer!')
+                    alert('✅ Reply saved! Email will be sent to customer.')
                 }
             } else {
                 const errData = await res.json().catch(() => ({}))

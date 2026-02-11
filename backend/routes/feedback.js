@@ -469,34 +469,35 @@ router.post('/:businessId/:feedbackId/reply', authenticate, async (req, res) => 
             return res.status(500).json({ error: 'Failed to save reply' });
         }
 
-        // Send reply email to customer if they provided an email (only for actual replies, not deletions)
-        let emailSent = false;
-        if (data?.customer_email && reply.trim()) {
-            try {
-                // Get business name for the email
-                const { data: biz } = await supabase
-                    .from('businesses')
-                    .select('name')
-                    .eq('id', businessId)
-                    .single();
+        // Respond immediately — don't block on email sending (prevents Vercel proxy timeout / 502)
+        const hasEmail = !!(data?.customer_email && reply.trim());
+        res.json({ message: 'Reply saved', feedback: data, emailSent: hasEmail ? 'pending' : false });
 
-                const result = await sendReplyToCustomer(
-                    data.customer_email,
-                    biz?.name || 'The Business',
-                    {
-                        originalMessage: data.message || '',
-                        originalRating: data.rating,
-                        replyText: reply.trim()
-                    }
-                );
-                emailSent = result.success;
-                console.log(`[Email] Reply sent to customer ${data.customer_email}: ${emailSent}`);
-            } catch (emailErr) {
-                console.error('[Email] Failed to send reply to customer:', emailErr.message);
-            }
+        // Fire-and-forget: send reply email to customer in background
+        if (hasEmail) {
+            (async () => {
+                try {
+                    const { data: biz } = await supabase
+                        .from('businesses')
+                        .select('name')
+                        .eq('id', businessId)
+                        .single();
+
+                    const result = await sendReplyToCustomer(
+                        data.customer_email,
+                        biz?.name || 'The Business',
+                        {
+                            originalMessage: data.message || '',
+                            originalRating: data.rating,
+                            replyText: reply.trim()
+                        }
+                    );
+                    console.log(`[Email] Reply sent to customer ${data.customer_email}: ${result.success}`);
+                } catch (emailErr) {
+                    console.error('[Email] Failed to send reply to customer:', emailErr.message);
+                }
+            })();
         }
-
-        res.json({ message: 'Reply saved', feedback: data, emailSent });
     } catch (error) {
         console.error('Reply error:', error);
         res.status(500).json({ error: 'Failed to save reply' });
