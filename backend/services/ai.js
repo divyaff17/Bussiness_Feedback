@@ -4,7 +4,11 @@
  * and classify it as positive/negative with a summary
  */
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDSBmUyElLYG2Z4vYudiIyAf1Y-eGZ4s4M';
+// SECURITY: No hardcoded API key — must be set via environment variable
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.warn('[AI] WARNING: GEMINI_API_KEY not set. AI analysis will be disabled.');
+}
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 /**
@@ -15,6 +19,10 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
  * @param {number} baseWaitMs - Base wait time per retry in ms (default 10000)
  */
 async function callGeminiWithRetry(prompt, maxTokens = 1000, retries = 3, baseWaitMs = 10000) {
+    if (!GEMINI_API_KEY) {
+        console.warn('[Gemini] API key not configured — skipping AI analysis');
+        return { ok: false, status: 0, error: 'API key not configured' };
+    }
     for (let attempt = 0; attempt < retries; attempt++) {
         const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
             method: 'POST',
@@ -73,6 +81,7 @@ function normalizeUrl(url) {
 /**
  * Fetch a URL and extract its text content for analysis
  * Works with Google Forms, survey pages, review sites, etc.
+ * SECURITY: Includes SSRF protection — blocks private/internal URLs
  */
 export async function fetchAndAnalyzeUrl(url, platformLabel) {
     if (!url) {
@@ -80,6 +89,23 @@ export async function fetchAndAnalyzeUrl(url, platformLabel) {
     }
 
     try {
+        // SECURITY: SSRF protection — block private/internal IPs
+        const parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+            return { error: 'Only HTTP/HTTPS URLs are allowed', feedbacks: [] };
+        }
+
+        const hostname = parsedUrl.hostname.toLowerCase();
+        const blockedPatterns = [
+            /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2[0-9]|3[01])\./,
+            /^192\.168\./, /^0\./, /^169\.254\./, /^::1$/, /\.local$/i, /\.internal$/i,
+        ];
+        for (const pattern of blockedPatterns) {
+            if (pattern.test(hostname)) {
+                return { error: 'URL points to a restricted address', feedbacks: [] };
+            }
+        }
+
         // Normalize URL for better access (e.g. Google Forms /edit → /viewform)
         const fetchUrl = normalizeUrl(url);
         console.log(`[fetchAndAnalyzeUrl] Original: ${url}`);

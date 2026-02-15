@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../db/supabase.js';
 import { authenticate } from '../middleware/auth.js';
 import { analyzeBulkSummary } from '../services/ai.js';
+import { isSafeUrl } from '../middleware/sanitize.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -142,6 +143,14 @@ router.post('/validate-review-url', async (req, res) => {
             return res.json({ 
                 valid: false, 
                 error: 'Invalid URL format. Please enter a valid URL starting with http:// or https://'
+            });
+        }
+
+        // SECURITY: SSRF protection — block private/internal IPs
+        if (!isSafeUrl(url)) {
+            return res.json({ 
+                valid: false, 
+                error: 'URL points to a restricted address and cannot be validated' 
             });
         }
 

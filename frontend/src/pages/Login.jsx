@@ -36,11 +36,33 @@ if (typeof document !== 'undefined' && !document.getElementById(GLASS_KEYFRAMES_
 export default function Login() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [magicEmail, setMagicEmail] = useState('')
     const [error, setError] = useState('')
+    const [success, setSuccess] = useState('')
     const [loading, setLoading] = useState(false)
+    const [magicLoading, setMagicLoading] = useState(false)
 
-    const { login } = useAuth()
+    const { login, sendMagicLink } = useAuth()
     const navigate = useNavigate()
+
+    const handleMagicLink = async () => {
+        if (!magicEmail) {
+            setError('Please enter your email address')
+            return
+        }
+        setMagicLoading(true)
+        setError('')
+        setSuccess('')
+
+        try {
+            await sendMagicLink(magicEmail)
+            setSuccess('Magic link sent! Check your email inbox and click the link to sign in.')
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setMagicLoading(false)
+        }
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -196,6 +218,19 @@ export default function Login() {
                             </div>
                         )}
 
+                        {success && (
+                            <div 
+                                className="mb-4 p-3 rounded-xl text-sm text-center"
+                                style={{
+                                    background: 'rgba(34, 197, 94, 0.2)',
+                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                    color: '#86efac',
+                                }}
+                            >
+                                {success}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             disabled={loading}
@@ -225,6 +260,58 @@ export default function Login() {
                                 )}
                             </span>
                         </button>
+
+                        {/* Divider */}
+                        <div className="flex items-center my-6">
+                            <div className="flex-1 h-px bg-white/10"></div>
+                            <span className="px-4 text-sm text-white/40">or sign in without password</span>
+                            <div className="flex-1 h-px bg-white/10"></div>
+                        </div>
+
+                        {/* Magic Link Sign-In */}
+                        <div className="space-y-3">
+                            <input
+                                type="email"
+                                value={magicEmail}
+                                onChange={(e) => setMagicEmail(e.target.value)}
+                                className="w-full px-4 py-3.5 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    backdropFilter: 'blur(10px)',
+                                }}
+                                placeholder="Enter email for magic link"
+                                disabled={magicLoading}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleMagicLink}
+                                disabled={magicLoading}
+                                className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    backdropFilter: 'blur(10px)',
+                                    opacity: magicLoading ? 0.7 : 1,
+                                }}
+                            >
+                                {magicLoading ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                                        Sending...
+                                    </span>
+                                ) : (
+                                    <>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                                        </svg>
+                                        Send Magic Link
+                                    </>
+                                )}
+                            </button>
+                            <p className="text-xs text-white/40 text-center">We'll email you a sign-in link — no password needed</p>
+                        </div>
                     </form>
 
                     <p className="text-center text-white/50 mt-6">

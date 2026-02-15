@@ -32,10 +32,11 @@ CREATE TABLE IF NOT EXISTS businesses (
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT, -- Can be NULL for Google OAuth users
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     owner_name TEXT,
     profile_picture_url TEXT,
+    google_id TEXT, -- Google OAuth user ID
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -50,6 +51,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'profile_picture_url') THEN
         ALTER TABLE users ADD COLUMN profile_picture_url TEXT;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'google_id') THEN
+        ALTER TABLE users ADD COLUMN google_id TEXT;
+    END IF;
+    -- Allow NULL password_hash for OAuth users
+    ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 END $$;
 
 -- ============================================

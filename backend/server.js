@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import hpp from 'hpp';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -9,6 +11,12 @@ const __dirname = dirname(__filename);
 
 // Load environment variables from the backend directory
 dotenv.config({ path: join(__dirname, '.env') });
+
+// ── SECURITY: Fail fast if critical secrets are missing ──
+if (!process.env.JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is not set. Server cannot start.');
+    process.exit(1);
+}
 
 // Import Supabase client (replaces SQLite)
 import './db/supabase.js';
@@ -21,6 +29,7 @@ import uploadRoutes from './routes/upload.js';
 
 // Import middleware
 import { apiLimiter } from './middleware/rateLimit.js';
+import { sanitizeInputs } from './middleware/sanitize.js';
 
 const app = express();
 const PORT = process.env.PORT || 8081;
@@ -28,7 +37,33 @@ const PORT = process.env.PORT || 8081;
 // Trust proxy - required for Railway/Vercel reverse proxy (fixes X-Forwarded-For rate limiting)
 app.set('trust proxy', 1);
 
-// CORS configuration - allow both local dev and production origins
+// ── SECURITY LAYER 1: HTTP Security Headers (Helmet) ──
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"],
+            fontSrc: ["'self'"],
+            objectSrc: ["'none'"],
+            frameSrc: ["'none'"],
+            baseUri: ["'self'"],
+            formAction: ["'self'"],
+        },
+    },
+    crossOriginEmbedderPolicy: false, // Allow cross-origin resources (API)
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    noSniff: true,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    xssFilter: true,
+}));
+
+// ── SECURITY LAYER 2: HTTP Parameter Pollution Protection ──
+app.use(hpp());
+
+// ── SECURITY LAYER 3: CORS configuration ──
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:8000').replace(/\/+$/, '').split('/').slice(0, 3).join('/');
 const allowedOrigins = [
     frontendUrl,
@@ -38,14 +73,24 @@ const allowedOrigins = [
 
 app.use(cors({
     origin: allowedOrigins,
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 600, // Preflight cache 10 min
 }));
 
-// Parse JSON bodies (increased limit for image uploads)
-app.use(express.json({ limit: '10mb' }));
+// ── SECURITY LAYER 4: Body parsing with strict limits ──
+app.use(express.json({ limit: '5mb' })); // Reduced from 10mb
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
-// Apply general rate limiting to all API routes
+// ── SECURITY LAYER 5: Input sanitization (XSS protection) ──
+app.use(sanitizeInputs);
+
+// ── SECURITY LAYER 6: Rate limiting ──
 app.use('/api', apiLimiter);
+
+// ── SECURITY: Remove fingerprinting headers ──
+app.disable('x-powered-by');
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -58,10 +103,11 @@ app.use('/api/business', businessRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// Error handling middleware
+// Error handling middleware — SECURITY: never leak stack traces
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    const isProduction = process.env.NODE_ENV === 'production';
+    console.error('Server error:', isProduction ? err.message : err);
+    res.status(err.status || 500).json({ error: 'Internal server error' });
 });
 
 // 404 handler

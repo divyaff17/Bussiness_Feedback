@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth.js';
 import { feedbackLimiter } from '../middleware/rateLimit.js';
 import { analyzeFeedback, analyzeBulkFeedback, analyzeExternalFeedback, fetchAndAnalyzeUrl } from '../services/ai.js';
 import { sendNegativeFeedbackAlert, sendReplyToCustomer } from '../services/email.js';
+import { isValidEmail, truncate } from '../middleware/sanitize.js';
 
 const router = express.Router();
 
@@ -20,6 +21,16 @@ router.post('/:businessId', feedbackLimiter, async (req, res) => {
         // Validate rating
         if (!rating || rating < 1 || rating > 5) {
             return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+        }
+
+        // SECURITY: Validate and limit input lengths
+        if (message && message.length > 5000) {
+            return res.status(400).json({ error: 'Feedback message is too long (max 5000 characters)' });
+        }
+
+        // SECURITY: Validate customer email format if provided
+        if (customerEmail && !isValidEmail(customerEmail)) {
+            return res.status(400).json({ error: 'Invalid email format' });
         }
 
         // Check if business exists

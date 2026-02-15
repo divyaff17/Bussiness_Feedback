@@ -26,8 +26,8 @@ const QR_STYLES = [
     {
         id: 'classic',
         name: 'Classic',
-        description: 'Clean & simple',
-        icon: '⬜',
+        description: 'Clean & minimal square style',
+        icon: null,
         getConfig: (url) => ({
             width: 300,
             height: 300,
@@ -43,8 +43,8 @@ const QR_STYLES = [
     {
         id: 'dots',
         name: 'Rounded',
-        description: 'Modern dot style',
-        icon: '⚫',
+        description: 'Modern rounded dot pattern',
+        icon: null,
         getConfig: (url) => ({
             width: 300,
             height: 300,
@@ -60,8 +60,8 @@ const QR_STYLES = [
     {
         id: 'branded',
         name: 'Logo Center',
-        description: 'Bold RD in center',
-        icon: '⚓',
+        description: 'Your brand logo in the center',
+        icon: null,
         getConfig: (url) => ({
             width: 300,
             height: 300,
@@ -82,9 +82,9 @@ const QR_STYLES = [
     },
     {
         id: 'premium',
-        name: 'ReviewDock Pro',
-        description: 'Full branded design',
-        icon: '💎',
+        name: 'Pro Gradient',
+        description: 'Premium gradient branded style',
+        icon: null,
         getConfig: (url) => ({
             width: 300,
             height: 300,
@@ -387,9 +387,8 @@ export default function QRCode() {
 
                                         {/* Style Label */}
                                         <div className="px-4 pt-4 pb-2 text-center">
-                                            <span className="text-xl">{style.icon}</span>
-                                            <h3 className="text-white font-semibold text-sm mt-1">{style.name}</h3>
-                                            <p className="text-white/40 text-xs">{style.description}</p>
+                                            <h3 className="text-white font-semibold text-sm">{style.name}</h3>
+                                            <p className="text-white/40 text-xs mt-0.5">{style.description}</p>
                                         </div>
 
                                         {/* QR Code Preview */}
@@ -430,7 +429,7 @@ export default function QRCode() {
                                                     color: 'rgba(255, 255, 255, 0.7)',
                                                 }}
                                             >
-                                                📥 Download
+                                                Download
                                             </button>
                                         </div>
                                     </div>

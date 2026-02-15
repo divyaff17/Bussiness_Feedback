@@ -436,11 +436,15 @@ export default function Dashboard() {
                     className="p-6 overflow-hidden relative mb-6"
                     style={{
                         ...glassCard,
-                        background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 50%, rgba(236, 72, 153, 0.2) 100%)',
+                        background: 'rgba(10, 20, 40, 0.6)',
+                        backdropFilter: 'blur(20px) saturate(1.8)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                        border: '1px solid rgba(100, 200, 255, 0.15)',
+                        boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(100, 200, 255, 0.05)',
                     }}
                 >
                     <div className="absolute inset-0 opacity-20" style={{
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(100, 200, 255, 0.1) 50%, transparent 100%)',
                         backgroundSize: '200% 100%',
                         animation: 'glassShine 8s ease-in-out infinite',
                     }}></div>
@@ -448,8 +452,8 @@ export default function Dashboard() {
                         <div 
                             className="w-16 h-16 rounded-full shadow-lg overflow-hidden flex-shrink-0"
                             style={{
-                                border: '3px solid rgba(255, 255, 255, 0.3)',
-                                boxShadow: '0 0 20px rgba(102, 126, 234, 0.4)',
+                                border: '3px solid rgba(100, 200, 255, 0.3)',
+                                boxShadow: '0 0 20px rgba(100, 200, 255, 0.4)',
                             }}
                         >
                             <img
@@ -485,16 +489,18 @@ export default function Dashboard() {
                 {/* Header with Filters */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
-                        <h1 
-                            className="text-2xl font-bold"
-                            style={{
-                                background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                backgroundClip: 'text',
-                            }}
-                        >
-                            📊 Dashboard
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <span>📊</span>
+                            <span
+                                style={{
+                                    background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >
+                                Dashboard
+                            </span>
                         </h1>
                         <p className="text-white/60">View feedback for your business</p>
                         <p className="text-xs text-green-400 flex items-center gap-1 mt-1">

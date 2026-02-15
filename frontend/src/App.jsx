@@ -47,6 +47,7 @@ import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import ThankYou from './pages/ThankYou'
+import AuthCallback from './pages/AuthCallback'
 
 // Protected Route wrapper
 function ProtectedRoute({ children }) {
@@ -94,6 +95,7 @@ function AppRoutes() {
             <Route path="/thank-you" element={<ThankYou />} />
 
             {/* Auth Routes */}
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/login" element={
                 <PublicRoute>
                     <Login />

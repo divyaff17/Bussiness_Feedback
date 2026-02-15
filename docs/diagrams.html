@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback System — Architecture Diagrams</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 40px 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 40px;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .diagram-section {
+            max-width: 1400px;
+            margin: 0 auto 60px;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid #334155;
+        }
+        .diagram-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .diagram-header h2 {
+            font-size: 1.4rem;
+            color: #93c5fd;
+        }
+        .download-btn {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        }
+        .download-btn:active { transform: translateY(0); }
+        .download-svg-btn {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+            margin-left: 10px;
+        }
+        .download-svg-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        }
+        .download-svg-btn:active { transform: translateY(0); }
+        .mermaid-container {
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+        .status {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            margin-top: 8px;
+            min-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Feedback System — Architecture Diagrams</h1>
+
+    <!-- Diagram 1 -->
+    <div class="diagram-section">
+        <div class="diagram-header">
+            <h2>1. Complete System Architecture</h2>
+            <div>
+                <button class="download-btn" onclick="downloadDiagram('diagram1', 'Complete_System_Architecture')">⬇ Download PNG</button>
+                <button class="download-svg-btn" onclick="downloadSVG('diagram1', 'Complete_System_Architecture')">⬇ Download SVG</button>
+            </div>
+        </div>
+        <div class="mermaid-container">
+            <div class="mermaid" id="diagram1">
+flowchart TB
+    subgraph EXT["CHROME EXTENSION"]
+        direction TB
+        EXT_MAN["manifest.json\nManifest V3\npermissions: storage, alarms, notifications"]
+        EXT_POP["popup.js + popup.html + popup.css\nLogin UI - Stats Display - Open Dashboard"]
+        EXT_BG["background.js\nService Worker\nPolls /alerts every 1 min\nFires Chrome notifications"]
+        EXT_MAN --> EXT_POP
+        EXT_MAN --> EXT_BG
+    end
+
+    subgraph FE["REACT FRONTEND - Vite - Port 8000"]
+        direction TB
+
+        subgraph FE_ENTRY["Entry"]
+            MAIN["main.jsx\nReactDOM.render"]
+            APP["App.jsx\nReact Router v6\nProtectedRoute - PublicRoute"]
+        end
+
+        subgraph FE_CTX["Context and Config"]
+            AUTH_CTX["context/AuthContext.jsx\nlogin - signup - magicLinkAuth\nsendMagicLink - logout - getToken"]
+            USE_AUTH["hooks/useAuth.js\nuseContext wrapper"]
+            API_CFG["config/api.js\nVITE_API_URL"]
+            SUPA_CFG["config/supabase.js\nSupabase browser client"]
+        end
+
+        subgraph FE_PUBLIC["Public Pages - No Auth"]
+            PG_LOGIN["Login.jsx\nEmail/password + Magic Link"]
+            PG_SIGNUP["Signup.jsx\nOTP verify + Registration"]
+            PG_FORGOT["ForgotPassword.jsx\nSend reset email"]
+            PG_RESET["ResetPassword.jsx\nToken-based reset"]
+            PG_FB["Feedback.jsx\nStar Rating + Message form\nRoute: /b/:businessId"]
+            PG_THANK["ThankYou.jsx\nPost-submit redirect"]
+            PG_AUTHCB["AuthCallback.jsx\nSupabase magic link handler"]
+        end
+
+        subgraph FE_PROTECTED["Protected Pages - JWT Required"]
+            PG_DASH["Dashboard.jsx\nStats - Feedback list - Search\nReply - Pin - Delete - Filter"]
+            PG_ANL["Analytics.jsx\nrecharts: Line - Bar - Pie - Area\nDate range filter"]
+            PG_QR["QRCode.jsx\nqr-code-styling library\n4 styles - Download PNG/SVG"]
+            PG_SET["Settings.jsx\nBusiness info - Profile - Logo\nExternal platforms - Password"]
+            PG_PRC["Pricing.jsx\nPlan display - Usage stats"]
+            PG_WEL["Welcome.jsx\nPost-login animated welcome"]
+        end
+
+        subgraph FE_COMP["Shared Components"]
+            LAYOUT["Layout.jsx\nSidebar nav - Top bar\nProfile dropdown - Logout"]
+            STAR["StarRating.jsx\n1-5 star interactive widget"]
+            GOOEY["GooeyNav.jsx\nAnimated nav bar"]
+            PROFILE["ProfileCard.jsx\nAnimated profile display"]
+            VFX["Visual Effects\nThreads - Lanyard - MeteorShower\nFlyingButterfly - CrackEffect\nNeuralBackground - Plasma\nLightRays - FluidWave - ElectricBorder"]
+        end
+
+        MAIN --> APP
+        APP --> AUTH_CTX
+        AUTH_CTX --> USE_AUTH
+        AUTH_CTX --> API_CFG
+        AUTH_CTX --> SUPA_CFG
+        APP --> FE_PUBLIC
+        APP --> FE_PROTECTED
+        FE_PROTECTED --> LAYOUT
+        PG_FB --> STAR
+    end
+
+    subgraph BE["EXPRESS BACKEND - Port 8081"]
+        direction TB
+
+        subgraph BE_ENTRY["Server Entry"]
+            SRV["server.js\nExpress app - Trust proxy\nMounts all routes under /api"]
+        end
+
+        subgraph BE_SEC["Security Middleware Stack"]
+            SEC1["1 helmet - HTTP Security Headers"]
+            SEC2["2 hpp - Parameter Pollution Protection"]
+            SEC3["3 cors - Whitelist Origins"]
+            SEC4["4 express.json limit: 5mb"]
+            SEC5["5 sanitizeInputs - XSS prevention"]
+            SEC6["6 apiLimiter - 100 req/min/IP"]
+            SEC1 --> SEC2 --> SEC3 --> SEC4 --> SEC5 --> SEC6
+        end
+
+        subgraph BE_MW["Route-Level Middleware"]
+            MW_AUTH["middleware/auth.js\nauthenticate - JWT HS256 verify\ngenerateToken - 1h access\ngenerateRefreshToken - 7d"]
+            MW_RATE["middleware/rateLimit.js\nauthLimiter: 10/15min\nfeedbackLimiter: 5/min\napiLimiter: 100/min"]
+            MW_SAN["middleware/sanitize.js\nisValidEmail - isStrongPassword\nisSafeUrl - truncate - escapeForEmail"]
+        end
+
+        subgraph BE_ROUTES["API Routes"]
+            R_AUTH["routes/auth.js - /api/auth\nPOST /send-otp - /verify-otp\nPOST /signup - /login - /google\nGET /me - POST /forgot-password\nPOST /reset-password - /change-password\nPOST /refresh-token"]
+            R_BIZ["routes/business.js - /api/business\nGET /:id public - PUT /:id\nPOST /validate-review-url\nGET /:id/stats - /analytics - /qr\nCRUD /:id/platforms\nCRUD /:id/external-summaries\nGET /:id/alerts - /plan"]
+            R_FB["routes/feedback.js - /api/feedback\nPOST /:businessId public 5/min\nGET /:businessId auth\nPOST /:businessId/external\nGET /:businessId/ai-summary\nPOST /:businessId/analyze-url\nPOST /:id/:fbId/reply\nDELETE - PATCH pin - GET export"]
+            R_UP["routes/upload.js - /api/upload\nPOST /avatar auth MIME whitelist\nDELETE /avatar auth"]
+        end
+
+        subgraph BE_SVC["Services"]
+            SVC_AI["services/ai.js\nGoogle Gemini 2.0 Flash\nanalyzeFeedback - analyzeBulkFeedback\nanalyzeExternalFeedback\nfetchAndAnalyzeUrl SSRF protected\nanalyzeBulkSummary"]
+            SVC_EM["services/email.js\nNodemailer SMTP/Gmail\ngenerateOTP crypto.randomInt\nsendOTPEmail\nsendNegativeFeedbackAlert\nsendReplyToCustomer\nHTML-escaped templates"]
+        end
+
+        SRV --> BE_SEC
+        BE_SEC --> BE_ROUTES
+        R_AUTH --> MW_AUTH
+        R_AUTH --> MW_RATE
+        R_AUTH --> MW_SAN
+        R_AUTH --> SVC_EM
+        R_BIZ --> MW_AUTH
+        R_BIZ --> MW_SAN
+        R_BIZ --> SVC_AI
+        R_FB --> MW_AUTH
+        R_FB --> MW_RATE
+        R_FB --> MW_SAN
+        R_FB --> SVC_AI
+        R_FB --> SVC_EM
+        R_UP --> MW_AUTH
+    end
+
+    subgraph DB["SUPABASE CLOUD"]
+        direction TB
+        SUPA_DB["PostgreSQL Database\nRow-Level Security RLS"]
+        SUPA_AUTH["Supabase Auth\nMagic Link OTP"]
+        DB_CONN["db/supabase.js\nService role key connection"]
+
+        subgraph TABLES["Database Tables"]
+            T_USERS["users"]
+            T_BIZ["businesses"]
+            T_FB["feedbacks"]
+            T_OTP["email_verification_otps"]
+            T_RST["password_reset_tokens"]
+            T_PLAT["review_platforms"]
+        end
+    end
+
+    subgraph EXTERNAL["EXTERNAL SERVICES"]
+        GEMINI["Google Gemini AI\nSentiment Analysis"]
+        SMTP["SMTP Server Gmail\nOTP - Alerts - Replies"]
+        SUPA_CLOUD["Supabase Cloud\nAuth + Database"]
+    end
+
+    FE -->|"HTTPS API calls\nJWT in Authorization header"| BE
+    EXT_POP -->|"POST /api/auth/login\nGET /api/business/:id/stats"| BE
+    EXT_BG -->|"GET /api/business/:id/alerts\nevery 1 minute"| BE
+    BE --> DB_CONN --> SUPA_DB
+    FE --> SUPA_CFG -->|"signInWithOtp"| SUPA_AUTH
+    SVC_AI -->|"POST generateContent"| GEMINI
+    SVC_EM -->|"SMTP send"| SMTP
+    PG_AUTHCB -->|"getSession"| SUPA_AUTH
+            </div>
+        </div>
+        <div class="status" id="status1"></div>
+    </div>
+
+    <!-- Diagram 2 -->
+    <div class="diagram-section">
+        <div class="diagram-header">
+            <h2>2. Data Flow — Feedback Submission to Dashboard</h2>
+            <div>
+                <button class="download-btn" onclick="downloadDiagram('diagram2', 'Data_Flow_Feedback')">⬇ Download PNG</button>
+                <button class="download-svg-btn" onclick="downloadSVG('diagram2', 'Data_Flow_Feedback')">⬇ Download SVG</button>
+            </div>
+        </div>
+        <div class="mermaid-container">
+            <div class="mermaid" id="diagram2">
+sequenceDiagram
+    autonumber
+    participant C as Customer
+    participant QR as QR Code
+    participant FB as Feedback Page /b/:businessId
+    participant API as Backend POST /api/feedback/:id
+    participant SAN as Sanitize MW
+    participant RL as Rate Limiter 5 req/min
+    participant AI as Gemini AI
+    participant SUP as Supabase DB
+    participant EM as Email Service
+    participant TY as ThankYou Page
+    participant OWN as Business Owner
+    participant DASH as Dashboard
+    participant EXT as Chrome Extension
+
+    C->>QR: Scans QR code
+    QR->>FB: Opens /b/{businessId}
+    FB->>API: GET /api/business/:id (public)
+    API->>SUP: Query businesses table
+    SUP-->>API: Business name, category, logo
+    API-->>FB: Business info
+    FB->>FB: Render star rating + message form
+
+    C->>FB: Submit rating + Great food!
+    FB->>API: POST /api/feedback/:businessId
+    API->>RL: Check rate limit (5/min/IP)
+    RL-->>API: Allowed
+    API->>SAN: Sanitize inputs
+    SAN-->>API: Clean data (length validated, email checked)
+    API->>AI: analyzeFeedback(Great food!)
+    AI-->>API: sentiment positive confidence 92
+    API->>SUP: INSERT INTO feedbacks
+    SUP-->>API: Saved
+
+    alt Negative Feedback (rating <= 2 or AI = negative)
+        API->>SUP: Get business owner email
+        API->>EM: sendNegativeFeedbackAlert()
+        EM-->>OWN: Negative feedback alert email
+        Note over EXT: background.js polls every 1 min
+        EXT->>API: GET /api/business/:id/alerts
+        API-->>EXT: New negative feedback found
+        EXT->>OWN: Chrome notification
+    end
+
+    API-->>FB: isPositive true googleReviewUrl
+    FB->>TY: Navigate to /thank-you
+
+    alt Positive
+        TY->>C: Thanks! Leave us a Google review?
+    else Negative
+        TY->>C: We will do better! Thank you.
+    end
+
+    OWN->>DASH: Opens /dashboard
+    DASH->>API: GET /api/business/:id/stats
+    DASH->>API: GET /api/feedback/:businessId
+    API->>SUP: Query feedbacks with filters
+    SUP-->>API: Feedback list
+    API-->>DASH: Stats + feedbacks with AI analysis
+    DASH->>DASH: Render charts list search filters
+
+    OWN->>DASH: Reply to feedback
+    DASH->>API: POST /api/feedback/:id/:fbId/reply
+    API->>EM: sendReplyToCustomer()
+    EM-->>C: Business X responded to your feedback
+            </div>
+        </div>
+        <div class="status" id="status2"></div>
+    </div>
+
+    <!-- Diagram 3 -->
+    <div class="diagram-section">
+        <div class="diagram-header">
+            <h2>3. Authentication Flows — All 5 Methods</h2>
+            <div>
+                <button class="download-btn" onclick="downloadDiagram('diagram3', 'Authentication_Flows')">⬇ Download PNG</button>
+                <button class="download-svg-btn" onclick="downloadSVG('diagram3', 'Authentication_Flows')">⬇ Download SVG</button>
+            </div>
+        </div>
+        <div class="mermaid-container">
+            <div class="mermaid" id="diagram3">
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant FE as Frontend
+    participant SUPA_C as Supabase Client
+    participant SUPA_S as Supabase Cloud Auth
+    participant CB as AuthCallback.jsx
+    participant CTX as AuthContext.jsx
+    participant API as Backend /api/auth
+    participant MW as auth.js middleware
+    participant DB as Supabase DB
+    participant MAIL as Email SMTP
+
+    rect rgb(30, 58, 95)
+        Note over U,MAIL: FLOW 1 - Email/Password Signup with OTP
+        U->>FE: Enter email on Signup page
+        FE->>API: POST /send-otp email businessName
+        API->>API: authLimiter 10/15min
+        API->>API: isValidEmail check
+        API->>API: crypto.randomInt 100000-999999
+        API->>DB: INSERT email_verification_otps
+        API->>MAIL: sendOTPEmail
+        MAIL-->>U: Your code 847293
+        U->>FE: Enter OTP
+        FE->>API: POST /verify-otp email otp
+        API->>DB: Verify OTP max 5 attempts 10min expiry
+        API-->>FE: verified true
+        U->>FE: Fill form and submit
+        FE->>API: POST /signup email password businessName
+        API->>API: isStrongPassword 8+ chars upper+lower+num
+        API->>API: bcrypt.genSalt 10 + hash
+        API->>DB: INSERT users + businesses
+        API->>MW: generateToken JWT HS256 1h with jti
+        API->>MW: generateRefreshToken 7d
+        API-->>FE: token refreshToken user
+        FE->>CTX: Store in sessionStorage
+        FE->>FE: Redirect to /welcome
+    end
+
+    rect rgb(20, 83, 45)
+        Note over U,MAIL: FLOW 2 - Email/Password Login
+        U->>FE: Enter email + password
+        FE->>API: POST /login email password
+        API->>API: authLimiter 10/15min
+        API->>DB: SELECT users WHERE email
+        API->>API: bcrypt.compare password hash
+        API->>MW: generateToken + generateRefreshToken
+        API-->>FE: token refreshToken user
+        FE->>CTX: sessionStorage.setItem token
+        FE->>FE: Redirect to /dashboard
+    end
+
+    rect rgb(88, 28, 135)
+        Note over U,MAIL: FLOW 3 - Magic Link Passwordless
+        U->>FE: Enter email click Magic Link
+        FE->>SUPA_C: supabase.auth.signInWithOtp
+        SUPA_C->>SUPA_S: Request magic link
+        SUPA_S-->>U: Click here to sign in email
+        U->>CB: Clicks link /auth/callback
+        CB->>SUPA_C: supabase.auth.getSession
+        SUPA_C-->>CB: user email metadata
+        CB->>CTX: magicLinkAuth email name picture
+        CTX->>API: POST /google email name picture
+        API->>DB: SELECT users WHERE email
+
+        alt User Exists
+            API->>MW: generateToken
+            API-->>CTX: token user isNewUser false
+            CTX->>CTX: sessionStorage then /welcome
+        else New User
+            API-->>CTX: needsSignup true email
+            CTX-->>CB: needsSignup flag
+            CB->>FE: Navigate to /signup prefilled
+        end
+    end
+
+    rect rgb(127, 29, 29)
+        Note over U,MAIL: FLOW 4 - Password Reset
+        U->>FE: ForgotPassword enter email
+        FE->>API: POST /forgot-password email
+        API->>API: authLimiter
+        API->>DB: Find user by email
+        API->>API: crypto.randomBytes 32 hex
+        API->>DB: INSERT password_reset_tokens 1h expiry
+        API->>MAIL: Send reset link token NOT in response
+        API-->>FE: If account exists link sent
+        U->>FE: Click link ResetPassword page
+        FE->>API: GET /verify-reset-token token
+        API->>DB: Check valid not expired not used
+        API-->>FE: valid true
+        U->>FE: Enter new password
+        FE->>API: POST /reset-password token newPassword
+        API->>API: isStrongPassword check
+        API->>API: bcrypt.hash newPassword 10
+        API->>DB: UPDATE users SET password_hash
+        API->>DB: Mark token as used
+        API-->>FE: Password reset successful
+    end
+
+    rect rgb(113, 63, 18)
+        Note over U,DB: FLOW 5 - Token Refresh and Session
+        FE->>CTX: On page load useEffect
+        CTX->>API: GET /me Bearer token
+        API->>MW: authenticate jwt.verify HS256
+
+        alt Token Valid
+            API->>DB: SELECT user
+            API-->>CTX: User data set state
+        else Token Expired 1h
+            API-->>CTX: 401 TOKEN_EXPIRED
+            CTX->>API: POST /refresh-token refreshToken
+            API->>MW: verifyRefreshToken
+            API->>MW: generateToken new 1h access
+            API-->>CTX: token refreshToken
+            CTX->>CTX: Update sessionStorage
+        end
+    end
+            </div>
+        </div>
+        <div class="status" id="status3"></div>
+    </div>
+
+    <!-- Diagram 4 -->
+    <div class="diagram-section">
+        <div class="diagram-header">
+            <h2>4. Frontend Architecture — React + Vite</h2>
+            <div>
+                <button class="download-btn" onclick="downloadDiagram('diagram4', 'Frontend_Architecture')">⬇ Download PNG</button>
+                <button class="download-svg-btn" onclick="downloadSVG('diagram4', 'Frontend_Architecture')">⬇ Download SVG</button>
+            </div>
+        </div>
+        <div class="mermaid-container">
+            <div class="mermaid" id="diagram4">
+flowchart TB
+    subgraph ENTRY["Entry Point"]
+        MAIN["main.jsx\nReactDOM.createRoot"]
+        APP["App.jsx\nBrowserRouter + AuthProvider"]
+    end
+
+    MAIN --> APP
+
+    subgraph ROUTING["React Router v6 Route Map"]
+        direction TB
+
+        subgraph PUBLIC_NOGUARD["Fully Public No Guard"]
+            R_FB["/b/:businessId Feedback.jsx\nQR landing page"]
+            R_TY["/thank-you ThankYou.jsx\nPost-submission"]
+            R_CB["/auth/callback AuthCallback.jsx\nSupabase redirect handler"]
+        end
+
+        subgraph PUBLIC_GUARD["PublicRoute Guard\nRedirects to /dashboard if logged in"]
+            R_LOGIN["/login Login.jsx"]
+            R_SIGNUP["/signup Signup.jsx"]
+            R_FORGOT["/forgot-password ForgotPassword.jsx"]
+            R_RESET["/reset-password ResetPassword.jsx"]
+        end
+
+        subgraph PROTECTED["ProtectedRoute Guard\nRedirects to /login if no JWT"]
+            R_WELCOME["/welcome Welcome.jsx"]
+            R_DASH["/dashboard Dashboard.jsx"]
+            R_QR["/qr-code /qr QRCode.jsx"]
+            R_SET["/settings Settings.jsx"]
+            R_PRC["/pricing Pricing.jsx"]
+            R_ANL["/analytics Analytics.jsx"]
+        end
+    end
+
+    APP --> ROUTING
+
+    subgraph LAYOUT_WRAP["Layout.jsx App Shell for Protected Pages"]
+        direction TB
+        SIDEBAR["Sidebar Navigation\nDashboard - QR Code - Analytics\nSettings - Pricing - Logout"]
+        TOPBAR["Top Bar\nBusiness name - Profile dropdown"]
+        CONTENT["Main Content Area\nRenders child page"]
+    end
+
+    R_DASH --> LAYOUT_WRAP
+    R_QR --> LAYOUT_WRAP
+    R_ANL --> LAYOUT_WRAP
+    R_SET --> LAYOUT_WRAP
+    R_PRC --> LAYOUT_WRAP
+
+    subgraph STATE["State Management"]
+        direction TB
+        AUTH_CTX["AuthContext.jsx\nuser - loading\nlogin - signup - logout\nmagicLinkAuth - sendMagicLink\ngetToken - getApiUrl - updateUser"]
+        USE_AUTH["useAuth.js hook\nuseContext AuthContext"]
+        API_URL["config/api.js\nVITE_API_URL"]
+        SUPA_CL["config/supabase.js\nSupabase browser client"]
+    end
+
+    AUTH_CTX --> USE_AUTH
+    AUTH_CTX --> API_URL
+    AUTH_CTX --> SUPA_CL
+
+    subgraph COMPONENTS["Shared Components"]
+        direction TB
+        C_STAR["StarRating.jsx\nUsed by: Feedback.jsx"]
+        C_GOOEY["GooeyNav.jsx\nUsed by: Layout.jsx"]
+        C_PROFILE["ProfileCard.jsx\nUsed by: Settings.jsx"]
+        C_THREADS["Threads.jsx\nUsed by: Login Signup\nForgotPassword Welcome"]
+        C_LANYARD["Lanyard.jsx\nUsed by: Welcome.jsx"]
+        C_METEOR["MeteorShower.jsx\nUsed by: Layout.jsx"]
+        C_CRACK["CrackEffect.jsx\nUsed by: Layout.jsx"]
+        C_FLY["FlyingButterfly.jsx\nUsed by: Layout.jsx"]
+    end
+
+    subgraph DEPS["Key Dependencies"]
+        direction LR
+        D1["react 18"]
+        D2["react-router-dom v6"]
+        D3["recharts"]
+        D4["supabase-js"]
+        D5["qr-code-styling"]
+        D6["tailwindcss 3.4"]
+        D7["react-three fiber"]
+    end
+            </div>
+        </div>
+        <div class="status" id="status4"></div>
+    </div>
+
+    <!-- Diagram 5 -->
+    <div class="diagram-section">
+        <div class="diagram-header">
+            <h2>5. Database Schema — Supabase PostgreSQL</h2>
+            <div>
+                <button class="download-btn" onclick="downloadDiagram('diagram5', 'Database_Schema')">⬇ Download PNG</button>
+                <button class="download-svg-btn" onclick="downloadSVG('diagram5', 'Database_Schema')">⬇ Download SVG</button>
+            </div>
+        </div>
+        <div class="mermaid-container">
+            <div class="mermaid" id="diagram5">
+erDiagram
+    users {
+        uuid id PK
+        string email UK
+        string password_hash
+        uuid business_id FK
+        string owner_name
+        string profile_picture_url
+        string google_id
+        timestamp created_at
+    }
+
+    businesses {
+        uuid id PK
+        string name
+        string category
+        string google_review_url
+        string logo_url
+        string owner_email
+        string subscription_plan
+        int monthly_feedback_limit
+        int monthly_feedback_count
+        string last_reset_date
+        timestamp created_at
+    }
+
+    feedbacks {
+        uuid id PK
+        uuid business_id FK
+        int rating
+        text message
+        boolean is_positive
+        string customer_email
+        string ai_sentiment
+        float ai_confidence
+        boolean sentiment_mismatch
+        string ai_summary
+        string ai_category
+        string source
+        boolean notified
+        boolean pinned
+        text reply_text
+        timestamp replied_at
+        timestamp created_at
+    }
+
+    review_platforms {
+        uuid id PK
+        uuid business_id FK
+        string platform_name
+        string platform_label
+        string url
+        boolean is_primary
+        boolean is_active
+        timestamp created_at
+    }
+
+    email_verification_otps {
+        uuid id PK
+        string email
+        string otp_code
+        timestamp expires_at
+        boolean verified
+        int attempts
+        timestamp created_at
+    }
+
+    password_reset_tokens {
+        uuid id PK
+        uuid user_id FK
+        string token
+        timestamp expires_at
+        boolean used
+        timestamp created_at
+    }
+
+    external_summaries {
+        uuid id PK
+        uuid business_id FK
+        string source_type
+        text content
+        text ai_analysis
+        timestamp created_at
+    }
+
+    users ||--|| businesses : "owns"
+    businesses ||--o{ feedbacks : "receives"
+    businesses ||--o{ review_platforms : "has"
+    businesses ||--o{ external_summaries : "has"
+    users ||--o{ password_reset_tokens : "has"
+            </div>
+        </div>
+        <div class="status" id="status5"></div>
+    </div>
+
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: false, htmlLabels: false, curve: 'basis' },
+            sequence: { useMaxWidth: false, actorMargin: 60, messageMargin: 40 }
+        });
+
+        async function downloadDiagram(id, filename) {
+            const statusEl = document.getElementById('status' + id.replace('diagram', ''));
+            statusEl.textContent = 'Generating PNG (this may take a few seconds)...';
+
+            try {
+                const container = document.getElementById(id);
+                if (!container) { statusEl.textContent = 'Error: Diagram not found.'; return; }
+
+                // Use html2canvas — works with foreignObject/HTML labels
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#0f172a',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    allowTaint: true
+                });
+
+                canvas.toBlob(function(blob) {
+                    if (!blob) { statusEl.textContent = 'Error: Failed to create image.'; return; }
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = filename + '.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                    statusEl.textContent = 'Downloaded ' + filename + '.png';
+                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
+                }, 'image/png');
+            } catch (err) {
+                statusEl.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        function downloadSVG(id, filename) {
+            const statusEl = document.getElementById('status' + id.replace('diagram', ''));
+            const container = document.getElementById(id);
+            const svgEl = container.querySelector('svg');
+            if (!svgEl) { statusEl.textContent = 'Error: Diagram not rendered.'; return; }
+
+            const clone = svgEl.cloneNode(true);
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bg.setAttribute('width', '100%');
+            bg.setAttribute('height', '100%');
+            bg.setAttribute('fill', '#0f172a');
+            clone.insertBefore(bg, clone.firstChild);
+
+            const svgString = new XMLSerializer().serializeToString(clone);
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename + '.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            statusEl.textContent = 'Downloaded ' + filename + '.svg';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
+        }
+    </script>
+</body>
+</html>

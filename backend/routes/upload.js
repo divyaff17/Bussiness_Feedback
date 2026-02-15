@@ -4,6 +4,9 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// SECURITY: Allowed MIME types for avatar uploads
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 /**
  * POST /api/upload/avatar
  * Upload profile picture - stores as base64 data URL in database
@@ -22,6 +25,14 @@ router.post('/avatar', authenticate, async (req, res) => {
         const matches = imageData.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
         if (!matches || matches.length !== 3) {
             return res.status(400).json({ error: 'Invalid image format' });
+        }
+
+        // SECURITY: Validate MIME type
+        const mimeType = matches[1];
+        if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+            return res.status(400).json({ 
+                error: `Invalid image type. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}` 
+            });
         }
 
         // Check image size (limit to 2MB of base64 data)

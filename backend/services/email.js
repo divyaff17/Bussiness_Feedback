@@ -1,5 +1,17 @@
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
+
+// SECURITY: HTML-escape function to prevent XSS in email templates
+function esc(str) {
+    if (typeof str !== 'string') return str || '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
 
 dotenv.config();
 
@@ -29,10 +41,11 @@ transporter.verify((error, success) => {
 });
 
 /**
- * Generate a 6-digit OTP code
+ * Generate a 6-digit OTP code using cryptographically secure random
+ * SECURITY: Uses crypto.randomInt instead of Math.random for unpredictability
  */
 export const generateOTP = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return crypto.randomInt(100000, 999999).toString();
 };
 
 /**
@@ -73,7 +86,7 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
                                             Hi there! 👋
                                         </p>
                                         <p style="margin: 0 0 30px; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 1.6;">
-                                            You're setting up <strong style="color: #a5b4fc;">${businessName}</strong> on our Feedback System. 
+                                            You're setting up <strong style="color: #a5b4fc;">${esc(businessName)}</strong> on our Feedback System. 
                                             Use this verification code to confirm your email:
                                         </p>
                                         
@@ -165,12 +178,12 @@ export const sendNegativeFeedbackAlert = async (email, businessName, feedback) =
                                 <tr>
                                     <td style="padding: 30px; background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1);">
                                         <p style="margin: 0 0 15px; color: rgba(255, 255, 255, 0.8); font-size: 16px;">
-                                            Hi, <strong style="color: #a5b4fc;">${businessName}</strong> received a negative review:
+                                            Hi, <strong style="color: #a5b4fc;">${esc(businessName)}</strong> received a negative review:
                                         </p>
                                         <div style="padding: 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; margin: 20px 0;">
                                             <p style="margin: 0 0 8px; color: #fbbf24; font-size: 18px;">${'⭐'.repeat(feedback.rating || 1)}${'☆'.repeat(5 - (feedback.rating || 1))}</p>
-                                            <p style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 15px; line-height: 1.6; font-style: italic;">"${feedback.message || 'No message provided'}"</p>
-                                            ${feedback.sentiment ? `<p style="margin: 10px 0 0; color: #f87171; font-size: 13px;">AI Sentiment: ${feedback.sentiment}</p>` : ''}
+                                            <p style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 15px; line-height: 1.6; font-style: italic;">"${esc(feedback.message) || 'No message provided'}"</p>
+                                            ${feedback.sentiment ? `<p style="margin: 10px 0 0; color: #f87171; font-size: 13px;">AI Sentiment: ${esc(feedback.sentiment)}</p>` : ''}
                                         </div>
                                         <p style="margin: 20px 0 0; color: rgba(255, 255, 255, 0.6); font-size: 14px;">
                                             💡 <strong>Tip:</strong> Reply quickly to negative feedback to improve customer satisfaction. Go to your Dashboard to respond.
@@ -245,7 +258,7 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
                                 <tr>
                                     <td style="padding: 30px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%); border-radius: 24px 24px 0 0; text-align: center;">
                                         <h1 style="margin: 0; font-size: 26px; color: #ffffff;">💬 You got a response!</h1>
-                                        <p style="margin: 10px 0 0; color: rgba(255,255,255,0.7); font-size: 14px;"><strong style="color: #a5b4fc;">${businessName}</strong> replied to your feedback</p>
+                                        <p style="margin: 10px 0 0; color: rgba(255,255,255,0.7); font-size: 14px;"><strong style="color: #a5b4fc;">${esc(businessName)}</strong> replied to your feedback</p>
                                     </td>
                                 </tr>
                                 
@@ -257,13 +270,13 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
                                         <p style="margin: 0 0 10px; color: rgba(255, 255, 255, 0.5); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Your Feedback</p>
                                         <div style="padding: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; margin: 0 0 24px;">
                                             <p style="margin: 0 0 8px; color: #fbbf24; font-size: 16px;">${stars}</p>
-                                            ${originalMessage ? `<p style="margin: 0; color: rgba(255, 255, 255, 0.8); font-size: 14px; line-height: 1.6; font-style: italic;">"${originalMessage}"</p>` : '<p style="margin: 0; color: rgba(255, 255, 255, 0.4); font-size: 14px;">No message</p>'}
+                                            ${originalMessage ? `<p style="margin: 0; color: rgba(255, 255, 255, 0.8); font-size: 14px; line-height: 1.6; font-style: italic;">"${esc(originalMessage)}"</p>` : '<p style="margin: 0; color: rgba(255, 255, 255, 0.4); font-size: 14px;">No message</p>'}
                                         </div>
                                         
                                         <!-- Business reply -->
-                                        <p style="margin: 0 0 10px; color: rgba(255, 255, 255, 0.5); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Response from ${businessName}</p>
+                                        <p style="margin: 0 0 10px; color: rgba(255, 255, 255, 0.5); font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Response from ${esc(businessName)}</p>
                                         <div style="padding: 16px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.1) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 12px;">
-                                            <p style="margin: 0; color: rgba(255, 255, 255, 0.95); font-size: 15px; line-height: 1.7;">${replyText}</p>
+                                            <p style="margin: 0; color: rgba(255, 255, 255, 0.95); font-size: 15px; line-height: 1.7;">${esc(replyText)}</p>
                                         </div>
                                         
                                         <p style="margin: 24px 0 0; color: rgba(255, 255, 255, 0.5); font-size: 13px; line-height: 1.6;">

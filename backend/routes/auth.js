@@ -3,9 +3,10 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../db/supabase.js';
-import { generateToken, authenticate } from '../middleware/auth.js';
+import { generateToken, generateRefreshToken, verifyRefreshToken, authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimit.js';
 import { generateOTP, sendOTPEmail } from '../services/email.js';
+import { isValidEmail, isStrongPassword, truncate } from '../middleware/sanitize.js';
 
 const router = express.Router();
 
@@ -17,9 +18,15 @@ router.post('/send-otp', authLimiter, async (req, res) => {
     try {
         const { email, businessName } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ error: 'Email is required' });
+        if (!email || !isValidEmail(email)) {
+            return res.status(400).json({ error: 'A valid email is required' });
         }
+
+        // SECURITY: always respond the same way to prevent email enumeration
+        const genericResponse = { 
+            message: 'If this email is available, a verification code has been sent',
+            expiresIn: 600
+        };
 
         // Check if email already exists
         const { data: existingUser } = await supabase
@@ -29,7 +36,8 @@ router.post('/send-otp', authLimiter, async (req, res) => {
             .single();
 
         if (existingUser) {
-            return res.status(400).json({ error: 'Email already registered' });
+            // Don't reveal that email exists — return same generic message
+            return res.json(genericResponse);
         }
 
         // Invalidate any existing OTPs for this email
@@ -137,18 +145,39 @@ router.post('/verify-otp', authLimiter, async (req, res) => {
  */
 router.post('/signup', authLimiter, async (req, res) => {
     try {
-        const { email, password, businessName, category, googleReviewUrl, ownerName, profilePictureUrl, reviewPlatforms } = req.body;
+        const { email, password, businessName, category, googleReviewUrl, ownerName, profilePictureUrl, reviewPlatforms, googleId } = req.body;
 
-        // Validation - support both legacy googleReviewUrl and new reviewPlatforms
+        // Validation - review platforms are now optional
         const hasReviewPlatforms = Array.isArray(reviewPlatforms) && reviewPlatforms.length > 0;
         const hasLegacyUrl = googleReviewUrl && googleReviewUrl.trim();
         
-        if (!email || !password || !businessName || !category || (!hasReviewPlatforms && !hasLegacyUrl)) {
-            return res.status(400).json({ error: 'All fields are required' });
+        // Password is required unless signing up with Google (googleId provided)
+        const isGoogleSignup = !!googleId;
+        
+        if (!email || !businessName || !category) {
+            return res.status(400).json({ error: 'Email, business name, and category are required' });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        // Password validation only for non-Google signups
+        if (!isGoogleSignup) {
+            if (!password) {
+                return res.status(400).json({ error: 'Password is required' });
+            }
+            if (!isStrongPassword(password)) {
+                return res.status(400).json({ 
+                    error: 'Password must be at least 8 characters with uppercase, lowercase, and a number' 
+                });
+            }
+        }
+
+        // SECURITY: Validate email format
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        // SECURITY: Truncate/validate business name length
+        if (businessName.length > 200) {
+            return res.status(400).json({ error: 'Business name is too long' });
         }
 
         // Check if email already exists
@@ -162,9 +191,12 @@ router.post('/signup', authLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
+        // Hash password (only if provided)
+        let passwordHash = null;
+        if (password) {
+            const salt = await bcrypt.genSalt(10);
+            passwordHash = await bcrypt.hash(password, salt);
+        }
 
         // Generate IDs
         const businessId = uuidv4();
@@ -197,7 +229,8 @@ router.post('/signup', authLimiter, async (req, res) => {
                 password_hash: passwordHash,
                 business_id: businessId,
                 owner_name: ownerName || null,
-                profile_picture_url: profilePictureUrl || null
+                profile_picture_url: profilePictureUrl || null,
+                google_id: googleId || null
             });
 
         if (userError) {
@@ -230,10 +263,12 @@ router.post('/signup', authLimiter, async (req, res) => {
 
         // Generate JWT
         const token = generateToken({ userId, businessId });
+        const refreshToken = generateRefreshToken({ userId, businessId });
 
         res.status(201).json({
             message: 'Account created successfully',
             token,
+            refreshToken,
             user: {
                 id: userId,
                 email: email.toLowerCase(),
@@ -280,10 +315,12 @@ router.post('/login', authLimiter, async (req, res) => {
 
         // Generate JWT
         const token = generateToken({ userId: user.id, businessId: user.business_id });
+        const refreshToken = generateRefreshToken({ userId: user.id, businessId: user.business_id });
 
         res.json({
             message: 'Login successful',
             token,
+            refreshToken,
             user: {
                 id: user.id,
                 email: user.email,
@@ -296,6 +333,160 @@ router.post('/login', authLimiter, async (req, res) => {
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ error: 'Failed to login' });
+    }
+});
+
+/**
+ * POST /api/auth/google
+ * Sign in or sign up via passwordless auth (Supabase Magic Link)
+ * Accepts user data from Supabase Auth callback
+ */
+router.post('/google', authLimiter, async (req, res) => {
+    try {
+        const { email, name, picture, googleId, businessName, category, googleReviewUrl, reviewPlatforms } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const userName = name || email.split('@')[0];
+        const userPicture = picture || null;
+
+        // Check if user already exists
+        const { data: existingUser, error: findError } = await supabase
+            .from('users')
+            .select('*, businesses(*)')
+            .eq('email', email.toLowerCase())
+            .single();
+
+        if (existingUser) {
+            // User exists - log them in
+            // Update profile picture if changed
+            if (userPicture && userPicture !== existingUser.profile_picture_url) {
+                await supabase
+                    .from('users')
+                    .update({ profile_picture_url: userPicture })
+                    .eq('id', existingUser.id);
+            }
+
+            // Update google_id if not set
+            if (googleId && !existingUser.google_id) {
+                await supabase
+                    .from('users')
+                    .update({ google_id: googleId })
+                    .eq('id', existingUser.id);
+            }
+
+            const token = generateToken({ userId: existingUser.id, businessId: existingUser.business_id });
+
+            return res.json({
+                message: 'Login successful',
+                token,
+                user: {
+                    id: existingUser.id,
+                    email: existingUser.email,
+                    businessId: existingUser.business_id,
+                    businessName: existingUser.businesses.name,
+                    ownerName: existingUser.owner_name || userName,
+                    profilePictureUrl: userPicture || existingUser.profile_picture_url
+                },
+                isNewUser: false
+            });
+        }
+
+        // New user - check if we have required signup fields
+        if (!businessName) {
+            // Return that we need more info for signup
+            return res.json({
+                needsSignup: true,
+                email,
+                name: userName,
+                picture: userPicture,
+                googleId,
+                message: 'Please complete your business registration'
+            });
+        }
+
+        // Create new user with Google
+        const businessId = uuidv4();
+        const userId = uuidv4();
+
+        // Create business
+        const { error: businessError } = await supabase
+            .from('businesses')
+            .insert({
+                id: businessId,
+                name: businessName,
+                category: category || 'Other',
+                google_review_url: googleReviewUrl || '',
+                subscription_plan: 'free',
+                monthly_feedback_limit: 50,
+                monthly_feedback_count: 0
+            });
+
+        if (businessError) {
+            console.error('Business creation error:', businessError);
+            return res.status(500).json({ error: 'Failed to create business' });
+        }
+
+        // Create user (no password for Google users)
+        const { error: userError } = await supabase
+            .from('users')
+            .insert({
+                id: userId,
+                email: email.toLowerCase(),
+                password_hash: null,
+                business_id: businessId,
+                owner_name: userName,
+                profile_picture_url: userPicture,
+                google_id: googleId || null
+            });
+
+        if (userError) {
+            console.error('User creation error:', userError);
+            await supabase.from('businesses').delete().eq('id', businessId);
+            return res.status(500).json({ error: 'Failed to create user' });
+        }
+
+        // Insert review platforms if provided
+        if (Array.isArray(reviewPlatforms) && reviewPlatforms.length > 0) {
+            const platformsToInsert = reviewPlatforms.map((p, idx) => ({
+                business_id: businessId,
+                platform_name: p.platform || 'custom',
+                platform_label: p.label || p.platform || 'Review Link',
+                url: p.url,
+                is_primary: p.isPrimary || idx === 0,
+                is_active: true
+            }));
+
+            const { error: platformError } = await supabase
+                .from('review_platforms')
+                .insert(platformsToInsert);
+
+            if (platformError) {
+                console.error('Review platforms insert error:', platformError);
+            }
+        }
+
+        // Generate JWT
+        const token = generateToken({ userId, businessId });
+
+        res.status(201).json({
+            message: 'Account created successfully',
+            token,
+            user: {
+                id: userId,
+                email: email.toLowerCase(),
+                businessId,
+                businessName,
+                ownerName: userName,
+                profilePictureUrl: userPicture
+            },
+            isNewUser: true
+        });
+    } catch (error) {
+        console.error('Google auth error:', error);
+        res.status(500).json({ error: 'Google authentication failed' });
     }
 });
 
@@ -385,13 +576,10 @@ router.post('/forgot-password', authLimiter, async (req, res) => {
             return res.status(500).json({ error: 'Failed to create reset token' });
         }
 
-        // In production, send email with reset link
-        // For now, return the token (for testing/demo purposes)
+        // SECURITY: Never return the token in response — send via email only
+        // TODO: Wire up sendPasswordResetEmail(email, resetToken) when SMTP is configured
         res.json({ 
-            message: 'If an account with that email exists, a password reset link has been generated.',
-            // Remove this in production - only for testing
-            resetToken,
-            resetLink: `/reset-password?token=${resetToken}`
+            message: 'If an account with that email exists, a password reset link has been sent.',
         });
     } catch (error) {
         console.error('Forgot password error:', error);
@@ -411,8 +599,10 @@ router.post('/reset-password', authLimiter, async (req, res) => {
             return res.status(400).json({ error: 'Token and new password are required' });
         }
 
-        if (newPassword.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({ 
+                error: 'Password must be at least 8 characters with uppercase, lowercase, and a number' 
+            });
         }
 
         // Find valid token
@@ -515,8 +705,10 @@ router.post('/change-password', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Current password and new password are required' });
         }
 
-        if (newPassword.length < 6) {
-            return res.status(400).json({ error: 'New password must be at least 6 characters' });
+        if (!isStrongPassword(newPassword)) {
+            return res.status(400).json({ 
+                error: 'New password must be at least 8 characters with uppercase, lowercase, and a number' 
+            });
         }
 
         if (currentPassword === newPassword) {
@@ -557,6 +749,48 @@ router.post('/change-password', authenticate, async (req, res) => {
     } catch (error) {
         console.error('Change password error:', error);
         res.status(500).json({ error: 'Failed to change password' });
+    }
+});
+
+/**
+ * POST /api/auth/refresh-token
+ * Exchange a refresh token for a new access token
+ */
+router.post('/refresh-token', authLimiter, async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+
+        if (!refreshToken) {
+            return res.status(400).json({ error: 'Refresh token is required' });
+        }
+
+        const decoded = verifyRefreshToken(refreshToken);
+        if (!decoded) {
+            return res.status(401).json({ error: 'Invalid or expired refresh token' });
+        }
+
+        // Verify user still exists
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('id, business_id')
+            .eq('id', decoded.userId)
+            .single();
+
+        if (error || !user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        // Issue new tokens
+        const newAccessToken = generateToken({ userId: user.id, businessId: user.business_id });
+        const newRefreshToken = generateRefreshToken({ userId: user.id, businessId: user.business_id });
+
+        res.json({
+            token: newAccessToken,
+            refreshToken: newRefreshToken,
+        });
+    } catch (error) {
+        console.error('Refresh token error:', error.message);
+        res.status(500).json({ error: 'Failed to refresh token' });
     }
 });
 

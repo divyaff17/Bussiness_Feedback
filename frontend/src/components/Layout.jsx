@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import API_URL from '../config/api'
-import LightRays from './LightRays'
+import MeteorShower from './MeteorShower'
 import FlyingButterfly from './FlyingButterfly'
 import CrackEffect from './CrackEffect'
 
@@ -25,8 +25,8 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             50% { border-color: rgba(255, 255, 255, 0.25); }
         }
         @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.5); }
+            0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(139, 92, 246, 0.5); }
         }
         @keyframes dropdownFadeIn {
             0% { opacity: 0; transform: translateY(-10px); }
@@ -34,11 +34,11 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
         }
         @keyframes logoGlow {
             0%, 100% { 
-                filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.5));
+                filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
                 transform: scale(1);
             }
             50% { 
-                filter: drop-shadow(0 0 20px rgba(118, 75, 162, 0.7));
+                filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.7));
                 transform: scale(1.02);
             }
         }
@@ -56,8 +56,8 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             75% { transform: scale(1.1) rotate(5deg); }
         }
         @keyframes activeGlow {
-            0%, 100% { box-shadow: 0 0 15px rgba(102, 126, 234, 0.4), inset 0 0 10px rgba(102, 126, 234, 0.1); }
-            50% { box-shadow: 0 0 25px rgba(118, 75, 162, 0.6), inset 0 0 15px rgba(118, 75, 162, 0.2); }
+            0%, 100% { box-shadow: 0 0 15px rgba(139, 92, 246, 0.4), inset 0 0 10px rgba(139, 92, 246, 0.1); }
+            50% { box-shadow: 0 0 25px rgba(168, 85, 247, 0.6), inset 0 0 15px rgba(168, 85, 247, 0.2); }
         }
         @keyframes navbarShine {
             0% { left: -100%; }
@@ -65,10 +65,10 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
         }
         @keyframes profileRing {
             0%, 100% { 
-                box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+                box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
             }
             50% { 
-                box-shadow: 0 0 0 4px rgba(102, 126, 234, 0);
+                box-shadow: 0 0 0 4px rgba(139, 92, 246, 0);
             }
         }
         @keyframes slideInNav {
@@ -92,7 +92,7 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             filter: drop-shadow(0 0 6px rgba(165, 180, 252, 0.7));
         }
         .nav-item-hover:hover {
-            background: linear-gradient(135deg, rgba(102, 126, 234, 0.18) 0%, rgba(168, 85, 247, 0.14) 50%, rgba(236, 72, 153, 0.10) 100%) !important;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.18) 0%, rgba(168, 85, 247, 0.14) 50%, rgba(192, 132, 252, 0.10) 100%) !important;
             border-color: rgba(139, 92, 246, 0.35) !important;
             box-shadow: 0 0 20px rgba(139, 92, 246, 0.15), 0 4px 15px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.08);
             transform: translateY(-1px);
@@ -117,12 +117,12 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             100% { transform: translateX(100%); }
         }
         @keyframes footerGlowPulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.08), inset 0 1px 0 rgba(255,255,255,0.05); }
-            50% { box-shadow: 0 0 40px rgba(118, 75, 162, 0.12), inset 0 1px 0 rgba(255,255,255,0.1); }
+            0%, 100% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.08), inset 0 1px 0 rgba(255,255,255,0.05); }
+            50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.12), inset 0 1px 0 rgba(255,255,255,0.1); }
         }
         @keyframes footerLinkGlow {
             0%, 100% { text-shadow: 0 0 0px transparent; }
-            50% { text-shadow: 0 0 8px rgba(102, 126, 234, 0.5); }
+            50% { text-shadow: 0 0 8px rgba(139, 92, 246, 0.5); }
         }
         .footer-link {
             position: relative;
@@ -136,7 +136,7 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
             left: 50%;
             width: 0;
             height: 1px;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, #8b5cf6, #a855f7);
             transition: all 0.3s ease;
             transform: translateX(-50%);
         }
@@ -145,7 +145,7 @@ if (typeof document !== 'undefined' && !document.getElementById(LAYOUT_KEYFRAMES
         }
         .footer-link:hover {
             color: rgba(255,255,255,1) !important;
-            text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 30px rgba(102, 126, 234, 0.5);
+            text-shadow: 0 0 12px rgba(255,255,255,0.6), 0 0 30px rgba(139, 92, 246, 0.5);
         }
     `;
     document.head.appendChild(style);
@@ -216,7 +216,7 @@ export default function Layout({ children }) {
     // Generate default avatar with initials
     const getDefaultAvatar = (name) => {
         const initial = (name || 'U').charAt(0).toUpperCase()
-        return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#667eea" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
+        return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect fill="#8b5cf6" width="100" height="100"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" fill="white" font-size="40" font-family="Arial">${initial}</text></svg>`)}`
     }
 
     const navItems = useMemo(() => [
@@ -229,23 +229,8 @@ export default function Layout({ children }) {
 
     return (
         <div className="min-h-screen bg-black relative overflow-hidden">
-            {/* LightRays Background */}
-            <div className="fixed inset-0 z-0">
-                <LightRays
-                    raysOrigin="top-center"
-                    raysColor="#ffffff"
-                    raysSpeed={0.5}
-                    lightSpread={0.5}
-                    rayLength={3}
-                    followMouse={false}
-                    mouseInfluence={0}
-                    noiseAmount={0}
-                    distortion={0}
-                    pulsating={false}
-                    fadeDistance={1}
-                    saturation={1}
-                />
-            </div>
+            {/* Meteor Shower Background */}
+            <MeteorShower />
 
             {/* Flying Butterflies */}
             <FlyingButterfly />
@@ -257,11 +242,11 @@ export default function Layout({ children }) {
             <nav 
                 className="fixed top-0 left-0 right-0 z-50"
                 style={{
-                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 50%, rgba(255, 255, 255, 0.1) 100%)',
-                    backdropFilter: 'blur(24px) saturate(1.5)',
-                    WebkitBackdropFilter: 'blur(24px) saturate(1.5)',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.15)',
-                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3), 0 1px 0 rgba(255,255,255,0.08) inset, 0 8px 32px rgba(102, 126, 234, 0.08)',
+                    background: 'rgba(10, 20, 40, 0.6)',
+                    backdropFilter: 'blur(20px) saturate(1.8)',
+                    WebkitBackdropFilter: 'blur(20px) saturate(1.8)',
+                    borderBottom: '1px solid rgba(100, 200, 255, 0.15)',
+                    boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3), 0 0 20px rgba(100, 200, 255, 0.05)',
                     overflow: 'visible',
                 }}
             >
@@ -269,7 +254,7 @@ export default function Layout({ children }) {
                 <div 
                     className="absolute top-0 h-full w-1/3 pointer-events-none"
                     style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent)',
+                        background: 'linear-gradient(90deg, transparent, rgba(100, 200, 255, 0.08), transparent)',
                         animation: 'navbarShine 8s ease-in-out infinite',
                         zIndex: 0,
                     }}
@@ -278,7 +263,7 @@ export default function Layout({ children }) {
                 <div 
                     className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
                     style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.4), rgba(118, 75, 162, 0.4), transparent)',
+                        background: 'linear-gradient(90deg, transparent, rgba(100, 200, 255, 0.4), rgba(150, 220, 255, 0.4), transparent)',
                     }}
                 />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative" style={{ overflow: 'visible', zIndex: 10 }}>
@@ -289,7 +274,7 @@ export default function Layout({ children }) {
                             <span 
                                 className="text-2xl"
                                 style={{
-                                    filter: 'drop-shadow(0 0 8px rgba(102, 126, 234, 0.6))',
+                                    filter: 'drop-shadow(0 0 8px rgba(139, 92, 246, 0.6))',
                                     animation: 'anchorSpin 12s linear infinite',
                                     display: 'inline-block',
                                 }}
@@ -299,12 +284,12 @@ export default function Layout({ children }) {
                             <span 
                                 className="text-2xl font-bold cursor-pointer relative"
                                 style={{
-                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 25%, #a5b4fc 50%, #764ba2 75%, #667eea 100%)',
-                                    backgroundSize: '200% auto',
+                                    background: 'linear-gradient(135deg, #a78bfa 0%, #c084fc 50%, #e879f9 100%)',
                                     WebkitBackgroundClip: 'text',
                                     WebkitTextFillColor: 'transparent',
                                     backgroundClip: 'text',
-                                    animation: 'logoShimmer 3s linear infinite, logoGlow 2s ease-in-out infinite',
+                                    filter: 'drop-shadow(0 0 12px rgba(168, 85, 247, 0.5))',
+                                    letterSpacing: '-0.02em',
                                 }}
                             >
                                 ReviewDock
@@ -321,22 +306,17 @@ export default function Layout({ children }) {
                                         `nav-item-hover px-4 py-2 rounded-xl font-medium flex items-center ${isActive ? '' : ''}`
                                     }
                                     style={({ isActive }) => ({
-                                        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        transition: 'all 0.25s ease',
                                         ...(isActive ? {
-                                            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.25) 50%, rgba(236, 72, 153, 0.18) 100%)',
-                                            border: '1px solid rgba(139, 92, 246, 0.5)',
-                                            color: '#e0e7ff',
-                                            boxShadow: '0 0 20px rgba(139, 92, 246, 0.25), 0 0 40px rgba(99, 102, 241, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-                                            textShadow: '0 0 10px rgba(165, 180, 252, 0.5)',
+                                            color: '#ffffff',
+                                            border: '1px solid rgba(255, 255, 255, 0.2)',
                                         } : {
-                                            color: 'rgba(255, 255, 255, 0.75)',
+                                            color: 'rgba(255, 255, 255, 0.7)',
                                             border: '1px solid transparent',
-                                            textShadow: 'none',
                                         }),
-                                        animationDelay: `${index * 0.1}s`,
                                     })}
                                 >
-                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1, filter: 'drop-shadow(0 0 3px rgba(165, 180, 252, 0.3))' }}>{item.icon}</span>
+                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1 }}>{item.icon}</span>
                                     <span className="font-semibold tracking-wide relative" style={{ letterSpacing: '0.02em' }}>
                                         {item.label}
                                         {item.badge > 0 && (
@@ -363,14 +343,14 @@ export default function Layout({ children }) {
                                     onClick={() => setShowProfileDropdown(!showProfileDropdown)}
                                     className="flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-300 group"
                                     style={{
-                                        background: showProfileDropdown ? 'rgba(102, 126, 234, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                                        border: showProfileDropdown ? '1px solid rgba(102, 126, 234, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
+                                        background: showProfileDropdown ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                                        border: showProfileDropdown ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
                                         animation: showProfileDropdown ? 'activeGlow 2s ease-in-out infinite' : 'none',
                                     }}
                                     onMouseEnter={(e) => {
                                         if (!showProfileDropdown) {
-                                            e.currentTarget.style.background = 'rgba(102, 126, 234, 0.15)'
-                                            e.currentTarget.style.border = '1px solid rgba(102, 126, 234, 0.3)'
+                                            e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)'
+                                            e.currentTarget.style.border = '1px solid rgba(139, 92, 246, 0.3)'
                                             e.currentTarget.style.transform = 'translateY(-1px)'
                                         }
                                     }}
@@ -387,8 +367,8 @@ export default function Layout({ children }) {
                                         alt="Profile"
                                         className="w-8 h-8 rounded-full object-cover"
                                         style={{
-                                            border: '2px solid rgba(102, 126, 234, 0.5)',
-                                            boxShadow: '0 0 10px rgba(102, 126, 234, 0.3)',
+                                            border: '2px solid rgba(139, 92, 246, 0.5)',
+                                            boxShadow: '0 0 10px rgba(139, 92, 246, 0.3)',
                                             animation: 'profileRing 4s ease-in-out infinite',
                                         }}
                                         onError={(e) => {
@@ -466,8 +446,8 @@ export default function Layout({ children }) {
                                     background: 'rgba(255, 255, 255, 0.1)',
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.2)'
-                                    e.currentTarget.style.boxShadow = '0 0 15px rgba(102, 126, 234, 0.3)'
+                                    e.currentTarget.style.background = 'rgba(139, 92, 246, 0.2)'
+                                    e.currentTarget.style.boxShadow = '0 0 15px rgba(139, 92, 246, 0.3)'
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
@@ -498,7 +478,7 @@ export default function Layout({ children }) {
                         <div 
                             className="flex items-center gap-3 px-4 py-3 rounded-xl mb-3"
                             style={{
-                                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
+                                background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%)',
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                             }}
                         >
@@ -507,7 +487,7 @@ export default function Layout({ children }) {
                                 alt="Profile"
                                 className="w-10 h-10 rounded-full object-cover"
                                 style={{
-                                    border: '2px solid rgba(102, 126, 234, 0.5)',
+                                    border: '2px solid rgba(139, 92, 246, 0.5)',
                                 }}
                                 onError={(e) => {
                                     e.target.src = getDefaultAvatar(user?.ownerName || user?.businessName)
@@ -587,7 +567,7 @@ export default function Layout({ children }) {
                 <div 
                     className="absolute top-0 left-0 right-0 h-px"
                     style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.6), rgba(118, 75, 162, 0.6), transparent)',
+                        background: 'linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.6), rgba(168, 85, 247, 0.6), transparent)',
                         backgroundSize: '200% 100%',
                         animation: 'logoShimmer 4s linear infinite',
                     }}
@@ -618,12 +598,11 @@ export default function Layout({ children }) {
                                 <span 
                                     className="text-xl font-bold"
                                     style={{
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 50%, #a5b4fc 100%)',
-                                        backgroundSize: '200% auto',
+                                        background: 'linear-gradient(135deg, #a78bfa 0%, #c084fc 35%, #f472b6 65%, #fb7185 100%)',
                                         WebkitBackgroundClip: 'text',
                                         WebkitTextFillColor: 'transparent',
                                         backgroundClip: 'text',
-                                        animation: 'logoShimmer 3s linear infinite',
+                                        filter: 'drop-shadow(0 0 10px rgba(192, 132, 252, 0.4))',
                                     }}
                                 >
                                     ReviewDock

@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import Threads from '../components/Threads'
 import API_URL from '../config/api'
@@ -66,6 +66,10 @@ export default function Signup() {
     const [uploadingImage, setUploadingImage] = useState(false)
     const fileInputRef = useRef(null)
     
+    // Google OAuth states
+    const [googleData, setGoogleData] = useState(null)
+    const [googleLoading, setGoogleLoading] = useState(false)
+    
     // OTP verification states
     const [showOtpStep, setShowOtpStep] = useState(false)
     const [otp, setOtp] = useState('')
@@ -75,9 +79,51 @@ export default function Signup() {
     const [otpSent, setOtpSent] = useState(false)
     const [otpCountdown, setOtpCountdown] = useState(0)
 
-    const { signup, getApiUrl, updateUser } = useAuth()
+    const { signup, getApiUrl, updateUser, magicLinkAuth, sendMagicLink } = useAuth()
     const navigate = useNavigate()
+    const location = useLocation()
 
+    // Handle data passed from auth callback (magic link)
+    useEffect(() => {
+        if (location.state?.googleData) {
+            const gData = location.state.googleData
+            setGoogleData(gData)
+            setFormData(prev => ({
+                ...prev,
+                ownerName: gData.name || '',
+                email: gData.email || '',
+            }))
+            // Set profile picture if available
+            if (gData.picture) {
+                setProfileImagePreview(gData.picture)
+            }
+            // Email is verified via magic link
+            setOtpVerified(true)
+        }
+    }, [location.state])
+
+    const [magicEmail, setMagicEmail] = useState('')
+    const [magicSuccess, setMagicSuccess] = useState('')
+
+    const handleMagicLinkSignUp = async () => {
+        const emailToSend = magicEmail || formData.email
+        if (!emailToSend) {
+            setError('Please enter your email address')
+            return
+        }
+        setGoogleLoading(true)
+        setError('')
+        setMagicSuccess('')
+
+        try {
+            await sendMagicLink(emailToSend)
+            setMagicSuccess('Magic link sent! Check your email inbox and click the link to continue sign up.')
+        } catch (err) {
+            setError(err.message)
+        } finally {
+            setGoogleLoading(false)
+        }
+    }
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value })
         // Reset OTP verification if email changes
@@ -281,28 +327,24 @@ export default function Signup() {
         e.preventDefault()
         setError('')
 
-        // Check if email is verified
-        if (!otpVerified) {
+        // Check if email is verified (skip for Google users - already verified)
+        if (!otpVerified && !googleData) {
             setError('Please verify your email address first')
             return
         }
 
-        // Check if at least one review platform is validated
-        const validPlatforms = reviewPlatforms.filter(p => p.valid === true && p.url)
-        if (validPlatforms.length === 0) {
-            setError('Please add and validate at least one review platform URL')
-            return
-        }
+        // Password validation only for non-Google signups
+        if (!googleData) {
+            // Validation
+            if (formData.password !== formData.confirmPassword) {
+                setError('Passwords do not match')
+                return
+            }
 
-        // Validation
-        if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match')
-            return
-        }
-
-        if (formData.password.length < 6) {
-            setError('Password must be at least 6 characters')
-            return
+            if (formData.password.length < 6) {
+                setError('Password must be at least 6 characters')
+                return
+            }
         }
 
         // Validate custom category if Other is selected
@@ -319,25 +361,17 @@ export default function Signup() {
                 ? formData.customCategory.trim() 
                 : formData.category
 
-            // Get validated platforms
-            const validPlatforms = reviewPlatforms.filter(p => p.valid === true && p.url)
-            const primaryPlatform = validPlatforms[0] // First one is primary
-
             const signupData = {
                 businessName: formData.businessName,
                 category: finalCategory,
-                googleReviewUrl: primaryPlatform?.url || '', // Use first platform as primary (legacy field)
+                googleReviewUrl: '',
                 logoUrl: formData.logoUrl || null,
                 email: formData.email,
-                password: formData.password,
+                password: googleData ? null : formData.password,
                 ownerName: formData.ownerName || null,
-                profilePictureUrl: null,
-                reviewPlatforms: validPlatforms.map((p, i) => ({
-                    url: p.url,
-                    platform: p.platform,
-                    label: p.label,
-                    isPrimary: i === 0
-                }))
+                profilePictureUrl: googleData?.picture || null,
+                reviewPlatforms: [],
+                googleId: googleData?.googleId || googleData?.sub || null
             }
 
             // Sign up the user first
@@ -457,6 +491,77 @@ export default function Signup() {
                         </h1>
                         <p className="text-white/60">Set up your review system in minutes</p>
                     </div>
+
+                    {/* Magic Link Sign-Up Option - only show if not already using magic link */}
+                    {!googleData && (
+                        <>
+                            <div className="relative mb-4">
+                                <input
+                                    type="email"
+                                    value={magicEmail}
+                                    onChange={(e) => setMagicEmail(e.target.value)}
+                                    className="w-full px-4 py-3.5 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        backdropFilter: 'blur(10px)',
+                                    }}
+                                    placeholder="Enter email for magic link"
+                                    disabled={googleLoading}
+                                />
+                            </div>
+                            <div className="relative mb-2">
+                                <button
+                                    type="button"
+                                    onClick={handleMagicLinkSignUp}
+                                    disabled={googleLoading}
+                                    className="w-full py-3.5 rounded-xl font-semibold text-white transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                                        backdropFilter: 'blur(10px)',
+                                        opacity: googleLoading ? 0.7 : 1,
+                                    }}
+                                >
+                                    {googleLoading ? (
+                                        <span className="flex items-center gap-2">
+                                            <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                                            Sending...
+                                        </span>
+                                    ) : (
+                                        <>
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <rect x="2" y="4" width="20" height="16" rx="2"/>
+                                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                                            </svg>
+                                            Sign up with Magic Link
+                                        </>
+                                    )}
+                                </button>
+                                <p className="text-xs text-white/40 text-center mt-2">We'll email you a sign-in link — no password needed</p>
+                            </div>
+
+                            {magicSuccess && (
+                                <div 
+                                    className="mb-4 p-3 rounded-xl text-sm text-center"
+                                    style={{
+                                        background: 'rgba(34, 197, 94, 0.2)',
+                                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                                        color: '#86efac',
+                                    }}
+                                >
+                                    {magicSuccess}
+                                </div>
+                            )}
+
+                            {/* Divider */}
+                            <div className="flex items-center mb-6 mt-4">
+                                <div className="flex-1 h-px bg-white/10"></div>
+                                <span className="px-4 text-sm text-white/40">or fill out the form</span>
+                                <div className="flex-1 h-px bg-white/10"></div>
+                            </div>
+                        </>
+                    )}
 
                     <form onSubmit={handleSubmit} className="relative">
                         {/* Profile Picture Upload */}
@@ -581,96 +686,6 @@ export default function Signup() {
                             </div>
                         )}
 
-                        {/* Review Platform URLs - Multi-Platform Support */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Review Platform URLs *
-                                <span className="text-xs text-white/40 ml-2">
-                                    (Google, Yelp, TripAdvisor, Google Forms, etc.)
-                                </span>
-                            </label>
-                            
-                            {reviewPlatforms.map((platform, index) => (
-                                <div key={index} className="mb-3" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 relative">
-                                            <input
-                                                type="url"
-                                                value={platform.url}
-                                                onChange={(e) => handlePlatformChange(index, e.target.value)}
-                                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none pr-24"
-                                                style={{
-                                                    background: 'rgba(255, 255, 255, 0.08)',
-                                                    border: platform.valid === true 
-                                                        ? '1px solid rgba(34, 197, 94, 0.5)' 
-                                                        : platform.valid === false 
-                                                        ? '1px solid rgba(239, 68, 68, 0.5)'
-                                                        : '1px solid rgba(255, 255, 255, 0.1)',
-                                                }}
-                                                placeholder={index === 0 ? "Primary: https://g.page/r/... or any review URL" : "https://..."}
-                                                disabled={loading}
-                                            />
-                                            {platform.valid === true && platform.label && (
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
-                                                    {getPlatformIcon(platform.platform)} {platform.label}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => validateReviewUrl(index)}
-                                            disabled={platform.validating || !platform.url || platform.valid === true}
-                                            className="px-4 py-3 rounded-xl font-medium text-white text-sm transition-all duration-300 whitespace-nowrap"
-                                            style={{
-                                                background: platform.validating || !platform.url 
-                                                    ? 'rgba(255, 255, 255, 0.1)'
-                                                    : platform.valid === true
-                                                    ? 'rgba(34, 197, 94, 0.3)'
-                                                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                                opacity: platform.validating || !platform.url ? 0.6 : 1,
-                                            }}
-                                        >
-                                            {platform.validating ? '...' : platform.valid === true ? '✓' : 'Validate'}
-                                        </button>
-                                        {reviewPlatforms.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removePlatform(index)}
-                                                className="px-3 py-3 rounded-xl text-red-400 hover:bg-red-500/20 transition-all duration-300"
-                                                style={{ background: 'rgba(255, 255, 255, 0.05)' }}
-                                            >
-                                                ✕
-                                            </button>
-                                        )}
-                                    </div>
-                                    {platform.message && (
-                                        <p className={`text-xs mt-1 ${platform.valid ? 'text-green-400' : 'text-red-400'}`}>
-                                            {platform.message}
-                                        </p>
-                                    )}
-                                    {index === 0 && (
-                                        <p className="text-xs text-white/40 mt-1">
-                                            ⭐ Primary: Positive feedback will redirect here
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
-                            
-                            {reviewPlatforms.length < 5 && (
-                                <button
-                                    type="button"
-                                    onClick={addPlatform}
-                                    className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 mt-2"
-                                >
-                                    + Add another review platform
-                                </button>
-                            )}
-                            
-                            <p className="text-xs text-white/40 mt-2">
-                                Supported: Google Maps, Yelp, TripAdvisor, Facebook, Google Forms, SurveyMonkey, Typeform, and more
-                            </p>
-                        </div>
-
                         {/* Logo URL (Optional) */}
                         <div className="mb-4">
                             <label className="block text-sm font-medium text-white/80 mb-2">
@@ -785,47 +800,66 @@ export default function Signup() {
                             </div>
                         )}
 
-                        {/* Password */}
-                        <div className="mb-4">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Password *
-                            </label>
-                            <input
-                                type="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
-                                style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                                }}
-                                placeholder="At least 6 characters"
-                                required
-                                disabled={loading}
-                            />
-                        </div>
+                        {/* Password - only for non-Google signups */}
+                        {!googleData && (
+                            <>
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-white/80 mb-2">
+                                        Password *
+                                    </label>
+                                    <input
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                        style={{
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        }}
+                                        placeholder="At least 6 characters"
+                                        required={!googleData}
+                                        disabled={loading}
+                                    />
+                                </div>
 
-                        {/* Confirm Password */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium text-white/80 mb-2">
-                                Confirm Password *
-                            </label>
-                            <input
-                                type="password"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                {/* Confirm Password */}
+                                <div className="mb-6">
+                                    <label className="block text-sm font-medium text-white/80 mb-2">
+                                        Confirm Password *
+                                    </label>
+                                    <input
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        className="w-full px-4 py-3 rounded-xl text-white placeholder-white/40 transition-all duration-300 focus:outline-none"
+                                        style={{
+                                            background: 'rgba(255, 255, 255, 0.08)',
+                                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        }}
+                                        placeholder="Repeat your password"
+                                        required={!googleData}
+                                        disabled={loading}
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        {/* Google signup notice */}
+                        {googleData && (
+                            <div 
+                                className="mb-6 p-3 rounded-xl text-sm text-center"
                                 style={{
-                                    background: 'rgba(255, 255, 255, 0.08)',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    background: 'rgba(34, 197, 94, 0.15)',
+                                    border: '1px solid rgba(34, 197, 94, 0.3)',
+                                    color: '#86efac',
                                 }}
-                                placeholder="Repeat your password"
-                                required
-                                disabled={loading}
-                            />
-                        </div>
+                            >
+                                <span className="mr-2">✓</span>
+                                Signing up with Google ({formData.email})
+                            </div>
+                        )}
 
                         {error && (
                             <div 
