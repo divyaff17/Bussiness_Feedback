@@ -76,7 +76,7 @@ router.post('/send-otp', authLimiter, async (req, res) => {
         });
     } catch (error) {
         console.error('Send OTP error:', error);
-        res.status(500).json({ error: 'Failed to send verification code' });
+        res.status(500).json({ error: 'Failed to send verification code', debug: error.message });
     }
 });
 
