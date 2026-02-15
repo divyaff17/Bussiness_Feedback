@@ -23,14 +23,19 @@ const useResend = !!process.env.RESEND_API_KEY;
  * Send email via Resend HTTP API (works on Railway/cloud platforms)
  */
 async function sendViaResend(mailOptions) {
+    const apiKey = process.env.RESEND_API_KEY;
+    console.log('Resend: Sending email to', mailOptions.to, 'with API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MISSING');
+    
+    const fromAddress = process.env.RESEND_FROM || 'ReviewDock <onboarding@resend.dev>';
+    
     const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            from: process.env.RESEND_FROM || 'ReviewDock <onboarding@resend.dev>',
+            from: fromAddress,
             to: [mailOptions.to],
             subject: mailOptions.subject,
             html: mailOptions.html,
@@ -38,12 +43,14 @@ async function sendViaResend(mailOptions) {
         })
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-        const err = await response.json();
-        throw new Error(`Resend API error: ${err.message || JSON.stringify(err)}`);
+        console.error('Resend API error response:', JSON.stringify(data));
+        throw new Error(`Resend API error: ${data.message || JSON.stringify(data)}`);
     }
 
-    const data = await response.json();
+    console.log('Resend email sent successfully:', data.id);
     return { success: true, messageId: data.id };
 }
 
