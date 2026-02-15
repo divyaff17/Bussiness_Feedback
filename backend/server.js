@@ -72,7 +72,15 @@ const allowedOrigins = [
 ].filter((v, i, a) => a.indexOf(v) === i); // deduplicate
 
 app.use(cors({
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+        // Allow exact matches
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // Allow all Vercel preview deployments for this project
+        if (/^https:\/\/bussiness-feedback-ap8e.*\.vercel\.app$/.test(origin)) return callback(null, true);
+        callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
