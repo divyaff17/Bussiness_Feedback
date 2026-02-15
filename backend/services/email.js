@@ -15,30 +15,96 @@ function esc(str) {
 
 dotenv.config();
 
-// Create transporter - uses environment variables for configuration
-// For production, use services like SendGrid, Mailgun, or AWS SES
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-    },
-    connectionTimeout: 8000,  // 8s connection timeout
-    greetingTimeout: 8000,    // 8s greeting timeout
-    socketTimeout: 10000      // 10s socket timeout
-});
+// ── Email sending strategy ──
+// Priority: RESEND_API_KEY (HTTP, works on Railway) → SMTP (local dev)
+const useResend = !!process.env.RESEND_API_KEY;
 
-// Verify transporter configuration
-transporter.verify((error, success) => {
-    if (error) {
-        console.log('Email service not configured:', error.message);
-        console.log('OTP verification will use console logging in development mode.');
-    } else {
-        console.log('Email service ready');
+/**
+ * Send email via Resend HTTP API (works on Railway/cloud platforms)
+ */
+async function sendViaResend(mailOptions) {
+    const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            from: process.env.RESEND_FROM || 'ReviewDock <onboarding@resend.dev>',
+            to: [mailOptions.to],
+            subject: mailOptions.subject,
+            html: mailOptions.html,
+            text: mailOptions.text
+        })
+    });
+
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(`Resend API error: ${err.message || JSON.stringify(err)}`);
     }
-});
+
+    const data = await response.json();
+    return { success: true, messageId: data.id };
+}
+
+/**
+ * Send email via SMTP (Nodemailer) - for local development
+ */
+async function sendViaSMTP(mailOptions) {
+    const info = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: info.messageId };
+}
+
+/**
+ * Unified email sender - automatically picks the right transport
+ */
+async function sendEmail(mailOptions) {
+    if (useResend) {
+        return sendViaResend(mailOptions);
+    }
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+        // Dev mode fallback
+        console.log('='.repeat(50));
+        console.log('📧 EMAIL (Development Mode - No email service configured)');
+        console.log('='.repeat(50));
+        console.log(`To: ${mailOptions.to}`);
+        console.log(`Subject: ${mailOptions.subject}`);
+        console.log(`Text: ${mailOptions.text?.substring(0, 200)}`);
+        console.log('='.repeat(50));
+        return { success: true, messageId: 'dev-mode' };
+    }
+    return sendViaSMTP(mailOptions);
+}
+
+// Create SMTP transporter (only used when RESEND_API_KEY is not set)
+let transporter;
+if (!useResend) {
+    transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: process.env.SMTP_SECURE === 'true',
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+        },
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 10000
+    });
+
+    transporter.verify((error, success) => {
+        if (error) {
+            console.log('SMTP email service not configured:', error.message);
+            console.log('OTP verification will use console logging in development mode.');
+        } else {
+            console.log('SMTP email service ready');
+        }
+    });
+}
+
+if (useResend) {
+    console.log('Email service: Resend (HTTP API) ✅');
+}
 
 /**
  * Generate a 6-digit OTP code using cryptographically secure random
@@ -122,29 +188,17 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
         text: `Your verification code for Feedback System is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
     };
 
-    // If SMTP is not configured, log to console (development mode)
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.log('='.repeat(50));
-        console.log('📧 OTP EMAIL (Development Mode)');
-        console.log('='.repeat(50));
-        console.log(`To: ${email}`);
-        console.log(`OTP Code: ${otp}`);
-        console.log(`Expires: 10 minutes`);
-        console.log('='.repeat(50));
-        return { success: true, messageId: 'dev-mode' };
-    }
-
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('OTP email sent:', info.messageId);
-        return { success: true, messageId: info.messageId };
+        const result = await sendEmail(mailOptions);
+        console.log('OTP email sent:', result.messageId);
+        return result;
     } catch (error) {
         console.error('Failed to send OTP email:', error);
         throw new Error('Failed to send verification email');
     }
 };
 
-export default transporter;
+export default { sendEmail };
 
 /**
  * Send negative feedback alert to business owner
@@ -205,22 +259,10 @@ export const sendNegativeFeedbackAlert = async (email, businessName, feedback) =
         text: `Negative Feedback Alert for ${businessName}\n\nRating: ${feedback.rating || 1}/5\nMessage: ${feedback.message || 'No message'}\n\nLog in to your Dashboard to respond.`
     };
 
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.log('='.repeat(50));
-        console.log('🚨 NEGATIVE FEEDBACK ALERT (Development Mode)');
-        console.log('='.repeat(50));
-        console.log(`To: ${email}`);
-        console.log(`Business: ${businessName}`);
-        console.log(`Rating: ${feedback.rating}/5`);
-        console.log(`Message: ${feedback.message}`);
-        console.log('='.repeat(50));
-        return { success: true, messageId: 'dev-mode' };
-    }
-
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('Negative feedback alert sent:', info.messageId);
-        return { success: true, messageId: info.messageId };
+        const result = await sendEmail(mailOptions);
+        console.log('Negative feedback alert sent:', result.messageId);
+        return result;
     } catch (error) {
         console.error('Failed to send negative feedback alert:', error);
         // Don't throw - alert email failure shouldn't block feedback submission
@@ -306,22 +348,10 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
         text: `${businessName} responded to your feedback\n\nYour Feedback:\nRating: ${originalRating}/5\n${originalMessage ? `Message: "${originalMessage}"` : 'No message'}\n\nResponse from ${businessName}:\n${replyText}\n\n---\nSent via ReviewDock`
     };
 
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.log('='.repeat(50));
-        console.log('💬 REPLY TO CUSTOMER (Development Mode)');
-        console.log('='.repeat(50));
-        console.log(`To: ${customerEmail}`);
-        console.log(`From: ${businessName}`);
-        console.log(`Original: ${originalRating}★ - ${originalMessage || 'No message'}`);
-        console.log(`Reply: ${replyText}`);
-        console.log('='.repeat(50));
-        return { success: true, messageId: 'dev-mode' };
-    }
-
     try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('Reply email sent to customer:', info.messageId);
-        return { success: true, messageId: info.messageId };
+        const result = await sendEmail(mailOptions);
+        console.log('Reply email sent to customer:', result.messageId);
+        return result;
     } catch (error) {
         console.error('Failed to send reply to customer:', error);
         return { success: false, error: error.message };
