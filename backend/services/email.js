@@ -15,105 +15,52 @@ function esc(str) {
 
 dotenv.config();
 
-// ── Email sending strategy ──
-// Priority: RESEND_API_KEY (HTTP, works on Railway) → SMTP (local dev)
-const resendKey = process.env.RESEND_API_KEY;
-const useResend = !!resendKey;
-console.log(`Email config: RESEND_API_KEY=${resendKey ? resendKey.substring(0, 8) + '...' : 'NOT SET'}, useResend=${useResend}`);
+// Create SMTP transporter
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000
+});
 
-/**
- * Send email via Resend HTTP API (works on Railway/cloud platforms)
- */
-async function sendViaResend(mailOptions) {
-    const apiKey = process.env.RESEND_API_KEY;
-    console.log('Resend: Sending email to', mailOptions.to, 'with API key:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MISSING');
-    
-    const fromAddress = process.env.RESEND_FROM || 'ReviewDock <onboarding@resend.dev>';
-    
-    const response = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            from: fromAddress,
-            to: [mailOptions.to],
-            subject: mailOptions.subject,
-            html: mailOptions.html,
-            text: mailOptions.text
-        })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-        console.error('Resend API error response:', JSON.stringify(data));
-        throw new Error(`Resend API error: ${data.message || JSON.stringify(data)}`);
+transporter.verify((error, success) => {
+    if (error) {
+        console.log('SMTP email service not configured:', error.message);
+    } else {
+        console.log('SMTP email service ready');
     }
+});
 
-    console.log('Resend email sent successfully:', data.id);
-    return { success: true, messageId: data.id };
-}
+export const generateOTP = () => {
+    return crypto.randomInt(100000, 999999).toString();
+};
 
-/**
- * Send email via SMTP (Nodemailer) - for local development
- */
-async function sendViaSMTP(mailOptions) {
-    const info = await transporter.sendMail(mailOptions);
-    return { success: true, messageId: info.messageId };
-}
+export const sendOTPEmail = async (email, otp, businessName = 'your business') => {
+    const mailOptions = {
+        from: process.env.SMTP_FROM || '"Feedback System" <noreply@feedback.app>',
+        to: email,
+        subject: 'Verify Your Email - Feedback System',
+        html: `...your HTML template here...`,
+        text: `Your verification code for Feedback System is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
+    };
 
-/**
- * Unified email sender - automatically picks the right transport
- */
-async function sendEmail(mailOptions) {
-    if (useResend) {
-        return sendViaResend(mailOptions);
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log('OTP email sent:', info.messageId);
+        return { success: true, messageId: info.messageId };
+    } catch (error) {
+        console.error('Failed to send OTP email:', error);
+        throw error;
     }
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        // Dev mode fallback
-        console.log('='.repeat(50));
-        console.log('📧 EMAIL (Development Mode - No email service configured)');
-        console.log('='.repeat(50));
-        console.log(`To: ${mailOptions.to}`);
-        console.log(`Subject: ${mailOptions.subject}`);
-        console.log(`Text: ${mailOptions.text?.substring(0, 200)}`);
-        console.log('='.repeat(50));
-        return { success: true, messageId: 'dev-mode' };
-    }
-    return sendViaSMTP(mailOptions);
-}
+};
 
-// Create SMTP transporter (only used when RESEND_API_KEY is not set)
-let transporter;
-if (!useResend) {
-    transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
-        },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 10000
-    });
-
-    transporter.verify((error, success) => {
-        if (error) {
-            console.log('SMTP email service not configured:', error.message);
-            console.log('OTP verification will use console logging in development mode.');
-        } else {
-            console.log('SMTP email service ready');
-        }
-    });
-}
-
-if (useResend) {
-    console.log('Email service: Resend (HTTP API) ✅');
-}
+export default transporter;
 
 /**
  * Generate a 6-digit OTP code using cryptographically secure random
