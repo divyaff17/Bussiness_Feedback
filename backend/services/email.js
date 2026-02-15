@@ -201,7 +201,7 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
         return result;
     } catch (error) {
         console.error('Failed to send OTP email:', error);
-        throw new Error('Failed to send verification email');
+        throw error; // Pass through actual error for debugging
     }
 };
 
