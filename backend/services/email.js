@@ -17,7 +17,9 @@ dotenv.config();
 
 // ── Email sending strategy ──
 // Priority: RESEND_API_KEY (HTTP, works on Railway) → SMTP (local dev)
-const useResend = !!process.env.RESEND_API_KEY;
+const resendKey = process.env.RESEND_API_KEY;
+const useResend = !!resendKey;
+console.log(`Email config: RESEND_API_KEY=${resendKey ? resendKey.substring(0, 8) + '...' : 'NOT SET'}, useResend=${useResend}`);
 
 /**
  * Send email via Resend HTTP API (works on Railway/cloud platforms)

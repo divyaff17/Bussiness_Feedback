@@ -105,6 +105,18 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', database: 'supabase', timestamp: new Date().toISOString() });
 });
 
+// Temporary debug endpoint - REMOVE AFTER FIXING
+app.get('/debug-email-config', (req, res) => {
+    const resendKey = process.env.RESEND_API_KEY;
+    res.json({
+        hasResendKey: !!resendKey,
+        resendKeyPrefix: resendKey ? resendKey.substring(0, 8) : 'NOT SET',
+        hasSmtpUser: !!process.env.SMTP_USER,
+        hasSmtpPass: !!process.env.SMTP_PASS,
+        nodeEnv: process.env.NODE_ENV || 'not set'
+    });
+});
+
 // Public routes
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
