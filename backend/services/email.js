@@ -2,7 +2,9 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 
-// SECURITY: HTML-escape function to prevent XSS in email templates
+dotenv.config();
+
+// ── SECURITY: HTML-escape function to prevent XSS in email templates ──
 function esc(str) {
     if (typeof str !== 'string') return str || '';
     return str
@@ -13,69 +15,61 @@ function esc(str) {
         .replace(/'/g, '&#x27;');
 }
 
-dotenv.config();
-
-// Create SMTP transporter
+// ── SMTP Transporter Configuration ──
+// Designed for Railway deployment (supports outbound SMTP on port 587)
+// Increased timeouts to 30s to avoid ETIMEDOUT on cloud hosts
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for 587
     auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        pass: process.env.SMTP_PASS,
     },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 10000
+    pool: true,                // reuse connections
+    maxConnections: 3,
+    maxMessages: 50,
+    connectionTimeout: 30000,  // 30 seconds
+    greetingTimeout: 30000,    // 30 seconds
+    socketTimeout: 60000,      // 60 seconds
+    tls: {
+        rejectUnauthorized: false, // allow self-signed certs on cloud hosts
+    },
+    logger: process.env.NODE_ENV !== 'production',
+    debug: process.env.NODE_ENV !== 'production',
 });
 
+// Verify SMTP connection on startup
 transporter.verify((error, success) => {
     if (error) {
-        console.log('SMTP email service not configured:', error.message);
+        console.error('⚠️  SMTP email service not configured:', error.message);
     } else {
-        console.log('SMTP email service ready');
+        console.log('✅ SMTP email service ready');
     }
 });
 
-export const generateOTP = () => {
-    return crypto.randomInt(100000, 999999).toString();
-};
-
-export const sendOTPEmail = async (email, otp, businessName = 'your business') => {
-    const mailOptions = {
-        from: process.env.SMTP_FROM || '"Feedback System" <noreply@feedback.app>',
-        to: email,
-        subject: 'Verify Your Email - Feedback System',
-        html: `...your HTML template here...`,
-        text: `Your verification code for Feedback System is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't request this, please ignore this email.`
-    };
-
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('OTP email sent:', info.messageId);
-        return { success: true, messageId: info.messageId };
-    } catch (error) {
-        console.error('Failed to send OTP email:', error);
-        throw error;
+// ── Core sendEmail helper with retry logic ──
+async function sendEmail(mailOptions, retries = 2) {
+    for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        try {
+            const info = await transporter.sendMail(mailOptions);
+            return { success: true, messageId: info.messageId };
+        } catch (error) {
+            console.error(`Email send attempt ${attempt}/${retries + 1} failed:`, error.message);
+            if (attempt > retries) throw error;
+            // Wait before retrying (exponential backoff: 2s, 4s)
+            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        }
     }
-};
+}
 
-export default transporter;
-
-/**
- * Generate a 6-digit OTP code using cryptographically secure random
- * SECURITY: Uses crypto.randomInt instead of Math.random for unpredictability
- */
+// ── Generate a 6-digit OTP ──
+// SECURITY: Uses crypto.randomInt instead of Math.random for unpredictability
 export const generateOTP = () => {
     return crypto.randomInt(100000, 999999).toString();
 };
 
-/**
- * Send OTP verification email
- * @param {string} email - Recipient email
- * @param {string} otp - OTP code to send
- * @param {string} businessName - Business name for personalization
- */
+// ── Send OTP verification email ──
 export const sendOTPEmail = async (email, otp, businessName = 'your business') => {
     const mailOptions = {
         from: process.env.SMTP_FROM || '"Feedback System" <noreply@feedback.app>',
@@ -150,18 +144,11 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
         return result;
     } catch (error) {
         console.error('Failed to send OTP email:', error);
-        throw error; // Pass through actual error for debugging
+        throw error;
     }
 };
 
-export default { sendEmail };
-
-/**
- * Send negative feedback alert to business owner
- * @param {string} email - Business owner email
- * @param {string} businessName - Business name
- * @param {object} feedback - Feedback details { message, rating, sentiment }
- */
+// ── Send negative feedback alert to business owner ──
 export const sendNegativeFeedbackAlert = async (email, businessName, feedback) => {
     const mailOptions = {
         from: process.env.SMTP_FROM || '"Feedback System" <noreply@feedback.app>',
@@ -226,12 +213,7 @@ export const sendNegativeFeedbackAlert = async (email, businessName, feedback) =
     }
 };
 
-/**
- * Send reply email to the customer who submitted feedback
- * @param {string} customerEmail - Customer's email address
- * @param {string} businessName - Business name
- * @param {object} details - { originalMessage, originalRating, replyText }
- */
+// ── Send reply email to the customer who submitted feedback ──
 export const sendReplyToCustomer = async (customerEmail, businessName, details) => {
     const { originalMessage, originalRating, replyText } = details;
     const stars = '⭐'.repeat(originalRating || 0) + '☆'.repeat(5 - (originalRating || 0));
@@ -313,3 +295,5 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
         return { success: false, error: error.message };
     }
 };
+
+export default transporter;
