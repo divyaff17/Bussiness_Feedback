@@ -1,4 +1,6 @@
+import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import dns from 'dns';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -15,68 +17,108 @@ function esc(str) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// Resend HTTP Email API (works on ALL cloud platforms)
-// SMTP ports (25/465/587) are blocked on Railway/Vercel/Render etc.
-// Resend uses HTTPS (port 443) which is never blocked.
-//
-// Setup:
-//   1. Sign up free at https://resend.com
-//   2. Get your API key from the dashboard
-//   3. Set RESEND_API_KEY in Railway environment variables
-//   4. (Optional) Verify your domain for custom "from" address
+// Force IPv4 DNS resolution globally
+// Many cloud hosts (Railway, Render) have IPv6 routing issues that
+// cause SMTP connections to hang/timeout. This forces IPv4 only.
 // ══════════════════════════════════════════════════════════════════
+dns.setDefaultResultOrder('ipv4first');
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const RESEND_FROM = process.env.RESEND_FROM || 'Feedback System <onboarding@resend.dev>';
-
-if (!RESEND_API_KEY) {
-    console.error('⚠️  RESEND_API_KEY is not set. Email sending will fail.');
-    console.error('   Sign up free at https://resend.com and set RESEND_API_KEY env var.');
-} else {
-    console.log('✅ Resend email service configured');
+// ── Resolve SMTP host to IPv4 address to bypass DNS/IPv6 issues ──
+async function resolveSmtpHost(host) {
+    return new Promise((resolve) => {
+        dns.resolve4(host, (err, addresses) => {
+            if (err || !addresses || addresses.length === 0) {
+                console.log(`DNS resolve4 failed for ${host}, using hostname directly`);
+                resolve(host);
+            } else {
+                console.log(`Resolved ${host} → ${addresses[0]} (IPv4)`);
+                resolve(addresses[0]);
+            }
+        });
+    });
 }
 
-// ── Core sendEmail helper using Resend HTTP API ──
-async function sendEmail(mailOptions, retries = 2) {
-    if (!RESEND_API_KEY) {
-        throw new Error('RESEND_API_KEY environment variable is not set. Sign up free at https://resend.com');
-    }
+// ── Create SMTP transporter ──
+// Uses port 465 with direct SSL (more reliable on cloud platforms)
+// Port 587 with STARTTLS is often blocked by cloud firewalls
+let transporter = null;
+let transporterReady = false;
 
+async function getTransporter() {
+    if (transporter && transporterReady) return transporter;
+
+    const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '465');
+    const smtpSecure = smtpPort === 465 ? true : (process.env.SMTP_SECURE === 'true');
+
+    // Resolve to IPv4 IP address to avoid IPv6 routing issues
+    const resolvedHost = await resolveSmtpHost(smtpHost);
+
+    transporter = nodemailer.createTransport({
+        host: resolvedHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+        },
+        connectionTimeout: 30000,   // 30 seconds
+        greetingTimeout: 30000,     // 30 seconds
+        socketTimeout: 60000,       // 60 seconds
+        tls: {
+            // Required when connecting by IP instead of hostname
+            servername: smtpHost,
+            rejectUnauthorized: false,
+            minVersion: 'TLSv1.2',
+        },
+        logger: process.env.NODE_ENV !== 'production',
+        debug: process.env.NODE_ENV !== 'production',
+    });
+
+    transporterReady = true;
+    return transporter;
+}
+
+// Verify SMTP on startup
+(async () => {
+    try {
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+            console.error('⚠️  SMTP_USER or SMTP_PASS not set. Email will not work.');
+            return;
+        }
+        const t = await getTransporter();
+        await t.verify();
+        console.log('✅ SMTP email service ready');
+    } catch (error) {
+        console.error('⚠️  SMTP verify failed:', error.message);
+        console.error('   Will retry on first email send.');
+        transporterReady = false;
+        transporter = null;
+    }
+})();
+
+// ── Core sendEmail helper with retry + transporter rebuild ──
+async function sendEmail(mailOptions, retries = 2) {
     for (let attempt = 1; attempt <= retries + 1; attempt++) {
         try {
-            const response = await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${RESEND_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    from: mailOptions.from || RESEND_FROM,
-                    to: Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to],
-                    subject: mailOptions.subject,
-                    html: mailOptions.html,
-                    text: mailOptions.text,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(`Resend API error (${response.status}): ${data.message || JSON.stringify(data)}`);
-            }
-
-            return { success: true, messageId: data.id };
+            const t = await getTransporter();
+            const info = await t.sendMail(mailOptions);
+            return { success: true, messageId: info.messageId };
         } catch (error) {
             console.error(`Email send attempt ${attempt}/${retries + 1} failed:`, error.message);
+
+            // Reset transporter so next attempt re-resolves DNS and reconnects
+            transporter = null;
+            transporterReady = false;
+
             if (attempt > retries) throw error;
-            // Exponential backoff: 2s, 4s
-            await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+            // Exponential backoff: 3s, 6s
+            await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
         }
     }
 }
 
 // ── Generate a 6-digit OTP ──
-// SECURITY: Uses crypto.randomInt instead of Math.random for unpredictability
 export const generateOTP = () => {
     return crypto.randomInt(100000, 999999).toString();
 };
@@ -84,7 +126,7 @@ export const generateOTP = () => {
 // ── Send OTP verification email ──
 export const sendOTPEmail = async (email, otp, businessName = 'your business') => {
     const mailOptions = {
-        from: RESEND_FROM,
+        from: process.env.SMTP_FROM || `"Feedback System" <${process.env.SMTP_USER}>`,
         to: email,
         subject: 'Verify Your Email - Feedback System',
         html: `
@@ -100,14 +142,11 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
                     <tr>
                         <td align="center" style="padding: 40px 20px;">
                             <table role="presentation" style="width: 100%; max-width: 480px; border-collapse: collapse;">
-                                <!-- Header -->
                                 <tr>
                                     <td style="padding: 30px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%); border-radius: 24px 24px 0 0; text-align: center;">
                                         <h1 style="margin: 0; font-size: 28px; color: #ffffff;">✉️ Email Verification</h1>
                                     </td>
                                 </tr>
-                                
-                                <!-- Content -->
                                 <tr>
                                     <td style="padding: 40px 30px; background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.95) 100%); border: 1px solid rgba(255, 255, 255, 0.1);">
                                         <p style="margin: 0 0 20px; color: rgba(255, 255, 255, 0.8); font-size: 16px; line-height: 1.6;">
@@ -117,22 +156,17 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
                                             You're setting up <strong style="color: #a5b4fc;">${esc(businessName)}</strong> on our Feedback System. 
                                             Use this verification code to confirm your email:
                                         </p>
-                                        
-                                        <!-- OTP Code Box -->
                                         <div style="text-align: center; margin: 30px 0;">
                                             <div style="display: inline-block; padding: 20px 40px; background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%); border: 2px solid rgba(102, 126, 234, 0.5); border-radius: 16px;">
                                                 <span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; color: #ffffff; font-family: 'Courier New', monospace;">${otp}</span>
                                             </div>
                                         </div>
-                                        
                                         <p style="margin: 30px 0 0; color: rgba(255, 255, 255, 0.5); font-size: 14px; line-height: 1.6;">
                                             ⏱️ This code expires in <strong>10 minutes</strong>.<br>
                                             🔒 If you didn't request this, please ignore this email.
                                         </p>
                                     </td>
                                 </tr>
-                                
-                                <!-- Footer -->
                                 <tr>
                                     <td style="padding: 20px 30px; background: rgba(20, 20, 30, 0.8); border-radius: 0 0 24px 24px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.05); border-top: none;">
                                         <p style="margin: 0; color: rgba(255, 255, 255, 0.4); font-size: 12px;">
@@ -163,16 +197,13 @@ export const sendOTPEmail = async (email, otp, businessName = 'your business') =
 // ── Send negative feedback alert to business owner ──
 export const sendNegativeFeedbackAlert = async (email, businessName, feedback) => {
     const mailOptions = {
-        from: RESEND_FROM,
+        from: process.env.SMTP_FROM || `"Feedback System" <${process.env.SMTP_USER}>`,
         to: email,
         subject: `⚠️ Negative Feedback Alert - ${businessName}`,
         html: `
             <!DOCTYPE html>
             <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
             <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 <table role="presentation" style="width: 100%; border-collapse: collapse;">
                     <tr>
@@ -230,16 +261,13 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
     const stars = '⭐'.repeat(originalRating || 0) + '☆'.repeat(5 - (originalRating || 0));
 
     const mailOptions = {
-        from: RESEND_FROM,
+        from: process.env.SMTP_FROM || `"ReviewDock" <${process.env.SMTP_USER}>`,
         to: customerEmail,
         subject: `${businessName} responded to your feedback`,
         html: `
             <!DOCTYPE html>
             <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
             <body style="margin: 0; padding: 0; background-color: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 <table role="presentation" style="width: 100%; border-collapse: collapse;">
                     <tr>
@@ -263,7 +291,7 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
                                             <p style="margin: 0; color: rgba(255, 255, 255, 0.95); font-size: 15px; line-height: 1.7;">${esc(replyText)}</p>
                                         </div>
                                         <p style="margin: 24px 0 0; color: rgba(255, 255, 255, 0.5); font-size: 13px; line-height: 1.6;">
-                                            Thank you for sharing your feedback. Your input helps businesses improve their services.
+                                            Thank you for sharing your feedback.
                                         </p>
                                     </td>
                                 </tr>
@@ -294,5 +322,4 @@ export const sendReplyToCustomer = async (customerEmail, businessName, details) 
     }
 };
 
-// Default export for backward compatibility
 export default { sendEmail };
