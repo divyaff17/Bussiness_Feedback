@@ -201,23 +201,23 @@ export default function Signup() {
     // Get platform icon
     const getPlatformIcon = (platform) => {
         const icons = {
-            google: '🗺️',
-            google_forms: '📋',
-            yelp: '⭐',
-            tripadvisor: '🦉',
-            facebook: '👤',
-            trustpilot: '⭐',
-            zomato: '🍴',
-            swiggy: '🍔',
-            surveymonkey: '📊',
-            typeform: '📝',
-            jotform: '📄',
-            amazon: '📦',
-            booking: '🏨',
-            airbnb: '🏠',
-            custom: '🔗'
+            google: 'Google',
+            google_forms: 'Form',
+            yelp: 'Review',
+            tripadvisor: 'Trip',
+            facebook: 'FB',
+            trustpilot: 'Review',
+            zomato: 'Zomato',
+            swiggy: 'Swiggy',
+            surveymonkey: 'Survey',
+            typeform: 'Form',
+            jotform: 'Form',
+            amazon: 'Amazon',
+            booking: 'Booking',
+            airbnb: 'Airbnb',
+            custom: 'Link'
         }
-        return icons[platform] || '🔗'
+        return icons[platform] || 'Link'
     }
 
     const handleImageChange = (e) => {

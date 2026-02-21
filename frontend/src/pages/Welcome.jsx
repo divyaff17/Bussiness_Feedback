@@ -93,9 +93,9 @@ export default function Welcome() {
                     style={{ animation: 'slideUp 1s ease-out 0.8s both' }}
                 >
                     {[
-                        { icon: '📊', text: 'Analytics' },
-                        { icon: '⭐', text: 'Reviews' },
-                        { icon: '📱', text: 'QR Codes' },
+                        { text: 'Analytics' },
+                        { text: 'Reviews' },
+                        { text: 'QR Codes' },
                     ].map((item, i) => (
                         <div 
                             key={i}
@@ -105,7 +105,6 @@ export default function Welcome() {
                                 border: '1px solid rgba(255, 255, 255, 0.1)',
                             }}
                         >
-                            <span>{item.icon}</span>
                             <span>{item.text}</span>
                         </div>
                     ))}

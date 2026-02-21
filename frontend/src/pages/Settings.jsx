@@ -161,11 +161,11 @@ export default function Settings() {
     }
 
     const sourceTypeLabels = {
-        google_form: { label: 'Google Form', icon: '📋', color: 'rgba(59, 130, 246, 0.3)' },
-        google_review: { label: 'Google Review', icon: '⭐', color: 'rgba(245, 158, 11, 0.3)' },
-        survey: { label: 'Survey', icon: '📝', color: 'rgba(139, 92, 246, 0.3)' },
-        email: { label: 'Email', icon: '📧', color: 'rgba(34, 197, 94, 0.3)' },
-        other: { label: 'Other', icon: '🔗', color: 'rgba(156, 163, 175, 0.3)' }
+        google_form: { label: 'Google Form', color: 'rgba(59, 130, 246, 0.3)' },
+        google_review: { label: 'Google Review', color: 'rgba(245, 158, 11, 0.3)' },
+        survey: { label: 'Survey', color: 'rgba(139, 92, 246, 0.3)' },
+        email: { label: 'Email', color: 'rgba(34, 197, 94, 0.3)' },
+        other: { label: 'Other', color: 'rgba(156, 163, 175, 0.3)' }
     }
 
     const handleChange = (e) => {
@@ -324,7 +324,7 @@ export default function Settings() {
                             backgroundClip: 'text',
                         }}
                     >
-                        ⚙️ Settings
+                        Settings
                     </h1>
                     <p className="text-white/60">Manage your business information</p>
                 </div>
@@ -531,7 +531,7 @@ export default function Settings() {
                                                             : '1px solid rgba(255, 255, 255, 0.1)',
                                                     }}
                                                 >
-                                                    <span className="text-xl">{st.icon}</span>
+                                                    <span className="text-sm font-semibold text-white/60 w-6">{st.label?.charAt(0) || '?'}</span>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
                                                             <span className="text-sm font-medium text-white/90 truncate">
@@ -569,7 +569,7 @@ export default function Settings() {
                                                         </div>
                                                         <p className="text-xs text-white/40 mt-0.5">
                                                             {st.label} • Saved {new Date(summary.created_at).toLocaleDateString()}
-                                                            {summary.is_analyzed && ` • ${summary.total_reviews_found} reviews (👍${summary.positive_count} 👎${summary.negative_count})`}
+                                                            {summary.is_analyzed && ` • ${summary.total_reviews_found} reviews (+${summary.positive_count} −${summary.negative_count})`}
                                                         </p>
                                                     </div>
                                                     <button
@@ -630,7 +630,7 @@ export default function Settings() {
                                                         color: 'rgba(255, 255, 255, 0.5)',
                                                     }}
                                                 >
-                                                    {val.icon} {val.label}
+                                                    {val.label}
                                                 </button>
                                             ))}
                                         </div>
@@ -904,7 +904,7 @@ export default function Settings() {
                                             onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors text-sm"
                                         >
-                                            {showPasswords.current ? '🙈' : '👁️'}
+                                            {showPasswords.current ? 'Hide' : 'Show'}
                                         </button>
                                     </div>
                                 </div>
@@ -937,7 +937,7 @@ export default function Settings() {
                                             onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors text-sm"
                                         >
-                                            {showPasswords.new ? '🙈' : '👁️'}
+                                            {showPasswords.new ? 'Hide' : 'Show'}
                                         </button>
                                     </div>
                                     {passwordData.newPassword && passwordData.newPassword.length < 6 && (
@@ -972,7 +972,7 @@ export default function Settings() {
                                             onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors text-sm"
                                         >
-                                            {showPasswords.confirm ? '🙈' : '👁️'}
+                                            {showPasswords.confirm ? 'Hide' : 'Show'}
                                         </button>
                                     </div>
                                     {passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (

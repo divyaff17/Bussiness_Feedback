@@ -5,6 +5,7 @@ import API_URL from '../config/api'
 import MeteorShower from './MeteorShower'
 import FlyingButterfly from './FlyingButterfly'
 import CrackEffect from './CrackEffect'
+import { IconDashboard, IconChart, IconQR, IconDiamond, IconSettings } from './Icons'
 
 // Inject layout animations
 const LAYOUT_KEYFRAMES_ID = 'layout-keyframes';
@@ -220,11 +221,11 @@ export default function Layout({ children }) {
     }
 
     const navItems = useMemo(() => [
-        { path: '/dashboard', label: 'Dashboard', icon: '📊', badge: newFeedbackCount },
-        { path: '/analytics', label: 'Analytics', icon: '📈' },
-        { path: '/qr-code', label: 'QR Code', icon: '📱' },
-        { path: '/pricing', label: 'Pricing', icon: '💎' },
-        { path: '/settings', label: 'Settings', icon: '⚙️' },
+        { path: '/dashboard', label: 'Dashboard', Icon: IconDashboard, badge: newFeedbackCount },
+        { path: '/analytics', label: 'Analytics', Icon: IconChart },
+        { path: '/qr-code', label: 'QR Code', Icon: IconQR },
+        { path: '/pricing', label: 'Pricing', Icon: IconDiamond },
+        { path: '/settings', label: 'Settings', Icon: IconSettings },
     ], [newFeedbackCount])
 
     return (
@@ -316,7 +317,7 @@ export default function Layout({ children }) {
                                         }),
                                     })}
                                 >
-                                    <span className="nav-icon mr-2" style={{ fontSize: '1.1rem', display: 'inline-block', lineHeight: 1 }}>{item.icon}</span>
+                                    <span className="nav-icon mr-2 flex items-center" style={{ display: 'inline-flex' }}>{item.Icon && <item.Icon className="w-5 h-5" />}</span>
                                     <span className="font-semibold tracking-wide relative" style={{ letterSpacing: '0.02em' }}>
                                         {item.label}
                                         {item.badge > 0 && (
@@ -515,7 +516,7 @@ export default function Layout({ children }) {
                                     border: '1px solid transparent',
                                 }}
                             >
-                                <span className="mr-2">{item.icon}</span>
+                                <span className="mr-2 inline-flex">{item.Icon && <item.Icon className="w-5 h-5" />}</span>
                                 {item.label}
                                 {item.badge > 0 && (
                                     <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold"

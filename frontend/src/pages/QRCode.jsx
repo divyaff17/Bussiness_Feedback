@@ -267,7 +267,7 @@ export default function QRCode() {
             <Layout>
                 <div className="max-w-4xl mx-auto animate-fadeIn">
                     <div className="p-6 text-center py-12" style={glassCard}>
-                        <div className="text-6xl mb-4">⚠️</div>
+                        <div className="text-5xl mb-4 text-yellow-400 font-bold">!</div>
                         <h2 
                             className="text-xl font-bold mb-2"
                             style={{
@@ -290,7 +290,7 @@ export default function QRCode() {
                                     color: 'white',
                                 }}
                             >
-                                🔄 Try Again
+                                Try Again
                             </button>
                             <button
                                 onClick={handleLogoutAndSignup}
@@ -301,7 +301,7 @@ export default function QRCode() {
                                     color: '#a5b4fc',
                                 }}
                             >
-                                📝 Sign Up Again
+                                Sign Up Again
                             </button>
                         </div>
                     </div>
@@ -447,7 +447,7 @@ export default function QRCode() {
                                     border: '1px solid rgba(255, 255, 255, 0.1)',
                                 }}
                             >
-                                <p className="text-sm text-white/50 mb-2 text-center">🔗 Feedback Link</p>
+                                <p className="text-sm text-white/50 mb-2 text-center">Feedback Link</p>
                                 <div className="flex items-center justify-center gap-2 flex-wrap">
                                     <code 
                                         className="px-3 py-2 rounded-lg text-sm font-mono break-all"
@@ -472,7 +472,7 @@ export default function QRCode() {
                                             color: '#a5b4fc',
                                         }}
                                     >
-                                        {copied ? '✓ Copied!' : '📋 Copy'}
+                                        {copied ? 'Copied!' : 'Copy'}
                                     </button>
                                 </div>
                             </div>
@@ -544,7 +544,7 @@ export default function QRCode() {
                                 color: '#a5b4fc',
                             }}
                         >
-                            📝 Sign Up Now
+                            Sign Up Now
                         </button>
                     </div>
                 )}

@@ -114,7 +114,7 @@ export default function Feedback() {
         return (
             <div className="min-h-screen flex items-center justify-center p-4">
                 <div className="card text-center max-w-md animate-fadeIn">
-                    <div className="text-6xl mb-4">{errorType === 'network' ? '🌐' : errorType === 'server' ? '⚠️' : '😕'}</div>
+                    <div className="text-5xl mb-4 text-yellow-400 font-bold">{errorType === 'network' ? '!' : errorType === 'server' ? '!' : '?'}</div>
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">
                         {errorType === 'network' ? 'Connection Error' : errorType === 'server' ? 'Server Error' : 'Page Not Found'}
                     </h1>
@@ -124,7 +124,7 @@ export default function Feedback() {
                             onClick={fetchBusiness}
                             className="btn-primary inline-block"
                         >
-                            🔄 Try Again
+                            Try Again
                         </button>
                     )}
                 </div>
@@ -139,7 +139,7 @@ export default function Feedback() {
                 <div className="card text-center max-w-md animate-fadeIn">
                     {result.isPositive ? (
                         <>
-                            <div className="text-6xl mb-4">🎉</div>
+                            <div className="text-5xl mb-4 text-green-400 font-bold">✓</div>
                             <h1 className="text-2xl font-bold text-gray-800 mb-4">
                                 Thanks for your review!
                             </h1>

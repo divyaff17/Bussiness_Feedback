@@ -117,7 +117,7 @@ export default function Pricing() {
                             backgroundClip: 'text',
                         }}
                     >
-                        💎 Choose Your Plan
+                        Choose Your Plan
                     </h1>
                     <p className="text-white/60">Simple, transparent pricing for your business</p>
                 </div>

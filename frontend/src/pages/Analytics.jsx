@@ -208,7 +208,7 @@ export default function Analytics() {
                                 backgroundClip: 'text',
                             }}
                         >
-                            📈 Analytics
+                            Analytics
                         </h1>
                         <p className="text-white/60">Track your feedback trends and performance</p>
                     </div>
@@ -314,7 +314,7 @@ export default function Analytics() {
                                     <p className="text-xs text-white/60">Negative</p>
                                 </div>
                             <div className="p-4 text-center" style={glassCard}>
-                                    <p className="text-3xl font-bold text-yellow-400">⭐ {analyticsData.summary.avgRating}</p>
+                                    <p className="text-3xl font-bold text-yellow-400">{analyticsData.summary.avgRating}</p>
                                     <p className="text-xs text-white/60">Avg Rating</p>
                                 </div>
                             <div className="p-4 text-center" style={glassCard}>
@@ -341,10 +341,10 @@ export default function Analytics() {
                                     {/* Chart Type Toggle */}
                                     <div className="flex gap-2">
                                         {[
-                                            { type: 'area', icon: '📊' },
-                                            { type: 'line', icon: '📈' },
-                                            { type: 'bar', icon: '📉' }
-                                        ].map(({ type, icon }) => (
+                                            { type: 'area', label: 'Area' },
+                                            { type: 'line', label: 'Line' },
+                                            { type: 'bar', label: 'Bar' }
+                                        ].map(({ type, label }) => (
                                             <button
                                                 key={type}
                                                 onClick={() => setChartType(type)}
@@ -357,7 +357,7 @@ export default function Analytics() {
                                                     border: '1px solid rgba(255, 255, 255, 0.1)',
                                                 }}
                                             >
-                                                {icon}
+                                                {label}
                                             </button>
                                         ))}
                                     </div>

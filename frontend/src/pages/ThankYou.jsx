@@ -9,7 +9,7 @@ export default function ThankYou() {
             <div className="card text-center max-w-md animate-fadeIn">
                 {isPositive ? (
                     <>
-                        <div className="text-6xl mb-4">🎉</div>
+                        <div className="text-5xl mb-4 text-green-400 font-bold">✓</div>
                         <h1 className="text-2xl font-bold text-gray-800 mb-4">
                             Thank you for your feedback!
                         </h1>
@@ -23,7 +23,7 @@ export default function ThankYou() {
                                 rel="noopener noreferrer"
                                 className="btn-primary inline-block"
                             >
-                                ⭐ Leave a Google Review
+                                Leave a Google Review
                             </a>
                         )}
                     </>

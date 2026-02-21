@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Layout from '../components/Layout'
 import API_URL from '../config/api'
+import { IconDashboard, IconList, IconChart, IconStar, IconTarget, IconMail, IconReply, IconSearch, IconExport, IconCheck, IconEdit, IconInbox, IconLink, IconDoc, IconAlert, IconEye, IconHide, IconCelebrate, IconBot } from '../components/Icons'
 
 // Glass card style helper
 const glassCard = {
@@ -261,7 +262,7 @@ export default function Dashboard() {
                 setReplyText('')
                 fetchData(false)
                 if (data.emailSent) {
-                    alert('✅ Reply saved! Email will be sent to customer.')
+                    alert('Reply saved! Email will be sent to customer.')
                 }
             } else {
                 const errData = await res.json().catch(() => ({}))
@@ -482,7 +483,7 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                     <div>
                         <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <span>📊</span>
+                            <span className="text-white/80"><IconDashboard className="w-7 h-7" /></span>
                             <span
                                 style={{
                                     background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%)',
@@ -552,11 +553,11 @@ export default function Dashboard() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                                 {[
-                                    { label: 'Total', icon: '📋', value: stats.total, color: '99, 102, 241', hex: '#818cf8', changeKey: 'totalChange' },
-                                    { label: 'Positive', icon: '👍', value: stats.positive, color: '34, 197, 94', hex: '#4ade80', changeKey: 'positiveChange' },
-                                    { label: 'Negative', icon: '👎', value: stats.negative, color: '239, 68, 68', hex: '#f87171', changeKey: 'negativeChange', invertArrow: true },
-                                    { label: 'Avg Rating', icon: '⭐', value: stats.avgRating || 0, suffix: '/5', color: '245, 158, 11', hex: '#fbbf24', changeKey: 'ratingChange', isRating: true },
-                                    { label: 'Success', icon: '📊', value: stats.positiveRate || 0, suffix: '%', color: '20, 184, 166', hex: '#2dd4bf' },
+                                    { label: 'Total', Icon: IconList, value: stats.total, color: '99, 102, 241', hex: '#818cf8', changeKey: 'totalChange' },
+                                    { label: 'Positive', Icon: IconChart, value: stats.positive, color: '34, 197, 94', hex: '#4ade80', changeKey: 'positiveChange' },
+                                    { label: 'Negative', Icon: IconChart, value: stats.negative, color: '239, 68, 68', hex: '#f87171', changeKey: 'negativeChange', invertArrow: true },
+                                    { label: 'Avg Rating', Icon: IconStar, value: stats.avgRating || 0, suffix: '/5', color: '245, 158, 11', hex: '#fbbf24', changeKey: 'ratingChange', isRating: true },
+                                    { label: 'Success', Icon: IconChart, value: stats.positiveRate || 0, suffix: '%', color: '20, 184, 166', hex: '#2dd4bf' },
                                 ].map((card, i) => {
                                     const change = stats.comparison?.[card.changeKey]
                                     return (
@@ -570,7 +571,7 @@ export default function Dashboard() {
                                         >
                                             <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full opacity-10" style={{ background: `rgba(${card.color}, 0.5)` }} />
                                             <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg" style={{ background: `rgba(${card.color}, 0.2)` }}>{card.icon}</div>
+                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `rgba(${card.color}, 0.2)`, color: card.hex }}>{card.Icon && <card.Icon className="w-5 h-5" />}</div>
                                                 <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">{card.label}</span>
                                             </div>
                                             <p className="text-3xl font-extrabold" style={{ color: card.hex }}>{card.value}{card.suffix && <span className="text-lg" style={{ color: card.hex, opacity: 0.6 }}>{card.suffix}</span>}</p>
@@ -597,7 +598,7 @@ export default function Dashboard() {
                                 border: '1px solid solid(168, 85, 247, 0.2)',
                             }}>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">🎯</span>
+                                    <span className="text-purple-400"><IconTarget className="w-5 h-5" /></span>
                                     <span className="text-xs font-semibold text-white/50 uppercase tracking-widest">NPS Score</span>
                                 </div>
                                 <p className="text-3xl font-extrabold" style={{ color: (stats.npsScore || 0) >= 50 ? '#4ade80' : (stats.npsScore || 0) < 0 ? '#fbbf24' : '#f87171' }}>
@@ -614,8 +615,8 @@ export default function Dashboard() {
                                 border: '1px solid rgba(59, 130, 246, 0.2)',
                             }}>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">elenium</span>
-                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-widid">Response Rate</span>
+                                    <span className="text-blue-400"><IconChart className="w-5 h-5" /></span>
+                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-widest">Response Rate</span>
                                 </div>
                                 <p className="text-3xl font-extrabold text-blue-400">{stats.responseRate || 0}<span className="text-lg text-blue-400/60">%</span></p>
                                 <p className="text-xs text-white/40 mt-1">{stats.replied || 0} of {stats.total || 0} replied</p>
@@ -627,8 +628,8 @@ export default function Dashboard() {
                                 border: '1px solid rgba(236, 72, 153, 0.2)',
                             }}>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-lg">lemetry</span>
-                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-widid">Avg Response Time</span>
+                                    <span className="text-pink-400"><IconChart className="w-5 h-5" /></span>
+                                    <span className="text-xs font-semibold text-white/50 uppercase tracking-widest">Avg Response Time</span>
                                 </div>
                                 <p className="text-3xl font-extrabold text-pink-400">
                                     {stats.avgResponseTime != null ? (
@@ -647,7 +648,7 @@ export default function Dashboard() {
                             {/* Rating Distribution Bars */}
                             <div className="p-6 rounded-2xl" style={glassCard}>
                                 <h3 className="text-sm font-bold text-white/80 mb-4 flex items-center gap-2">
-                                    <span>⭐</span> Rating Rating
+                                    <span className="text-yellow-400"><IconStar className="w-5 h-5 inline" /></span> Rating
                                 </h3>
                                 <div className="space-y-3">
                                     {[5, 4, 3, 2, 1].map(star => {
@@ -656,7 +657,7 @@ export default function Dashboard() {
                                         const count = dist?.count || 0
                                         return (
                                             <div key={star} className="flex items-center gap-3">
-                                                <span className="text-sm text-white/70 w-12 font-medium">{star} ⭐</span>
+                                                <span className="text-sm text-white/70 w-12 font-medium">{star} <IconStar className="w-4 h-4 inline text-yellow-400" /></span>
                                                 <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                                                     <div
                                                         className="h-full rounded-full transition-all duration-700 ease-out"
@@ -679,7 +680,7 @@ export default function Dashboard() {
                             {/* Top Keywords */}
                             <div className="p-6 rounded-2xl" style={glassCard}>
                                 <h3 className="text-sm font-bold text-white/80 mb-4 flex items-center gap-2">
-                                    <span>🏷️</span> Top Keywords
+                                    <span className="text-white/70"><IconDoc className="w-5 h-5 inline" /></span> Top Keywords
                                 </h3>
                                 {stats.topKeywords?.length > 0 ? (
                                     <div className="flex flex-wrap gap-2">
@@ -755,7 +756,7 @@ export default function Dashboard() {
                                             color: 'rgba(255, 255, 255, 0.6)',
                                         }}
                                     >
-                                        ⭐ Positive ({stats.positive})
+                                        Positive ({stats.positive})
                                     </button>
                                     <button
                                         onClick={() => setFeedbackType('negative')}
@@ -770,7 +771,7 @@ export default function Dashboard() {
                                             color: 'rgba(255, 255, 255, 0.6)',
                                         }}
                                     >
-                                        ⚠️ Negative ({stats.negative})
+                                        Negative ({stats.negative})
                                     </button>
                                     <button
                                         onClick={exportCSV}
@@ -783,7 +784,7 @@ export default function Dashboard() {
                                             opacity: (exporting || feedbacks.length === 0) ? 0.5 : 1,
                                         }}
                                     >
-                                        {exporting ? '⏳ Exporting...' : '📥 Export CSV'}
+                                        {exporting ? 'Exporting...' : <><IconExport className="w-4 h-4 inline mr-1" /> Export CSV</>}
                                     </button>
                                 </div>
                             </div>
@@ -795,7 +796,7 @@ export default function Dashboard() {
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="🔍 Search feedback messages..."
+                                        placeholder="Search feedback messages..."
                                         className="w-full px-4 py-2.5 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none transition-all"
                                         style={{
                                             background: 'rgba(255, 255, 255, 0.06)',
@@ -812,7 +813,7 @@ export default function Dashboard() {
 
                             {feedbacks.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <span className="text-4xl block mb-2">{feedbackType === 'negative' ? '🎉' : '📭'}</span>
+                                    <span className="block mb-2 text-white/50">{feedbackType === 'negative' ? <IconCelebrate className="w-12 h-12 mx-auto" /> : <IconInbox className="w-12 h-12 mx-auto" />}</span>
                                     <p className="text-white/60">
                                         {feedbackType === 'negative' 
                                             ? `No negative feedback ${getFilterLabel()}`
@@ -823,7 +824,7 @@ export default function Dashboard() {
                                 </div>
                             ) : filteredFeedbacks.length === 0 ? (
                                 <div className="text-center py-8">
-                                    <span className="text-2xl block mb-2">🔍</span>
+                                    <span className="block mb-2 text-white/50"><IconSearch className="w-10 h-10 mx-auto" /></span>
                                     <p className="text-white/60">No feedback matches "{searchQuery}"</p>
                                 </div>
                             ) : (
@@ -864,7 +865,7 @@ export default function Dashboard() {
                                                         </span>
                                                         {feedback.owner_reply && (
                                                             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400">
-                                                                ✅ Replied
+                                                                <><IconCheck className="w-3.5 h-3.5 inline mr-0.5" /> Replied</>
                                                             </span>
                                                         )}
                                                     </div>
@@ -907,7 +908,7 @@ export default function Dashboard() {
                                                     }}
                                                 >
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-xs font-semibold text-blue-400">💬 Your Reply</span>
+                                                        <span className="text-xs font-semibold text-blue-400"><IconReply className="w-3.5 h-3.5 inline mr-0.5" /> Your Reply</span>
                                                         <span className="text-xs text-white/30">
                                                             {feedback.replied_at && formatDate(feedback.replied_at)}
                                                         </span>
@@ -933,8 +934,8 @@ export default function Dashboard() {
                                                                 color: '#93c5fd',
                                                             }}
                                                         >
-                                                            {feedback.owner_reply ? '✏️ Edit Reply' : '💬 Reply'}
-                                                            <span title="Reply will be emailed to customer" className="ml-1">📧</span>
+                                                            {feedback.owner_reply ? <><IconEdit className="w-3.5 h-3.5 inline mr-0.5" /> Edit Reply</> : <><IconReply className="w-3.5 h-3.5 inline mr-0.5" /> Reply</>}
+                                                            <span title="Reply will be emailed to customer" className="ml-1 inline"><IconMail className="w-3.5 h-3.5" /></span>
                                                         </button>
                                                     ) : (
                                                         <span className="text-xs px-3 py-1.5 text-white/40 italic">
@@ -961,7 +962,7 @@ export default function Dashboard() {
                                                                 color: hiddenReplies.has(feedback.id) ? '#93c5fd' : 'rgba(255, 255, 255, 0.5)',
                                                             }}
                                                         >
-                                                            {hiddenReplies.has(feedback.id) ? '👁️ Show Reply' : '🚫 Hide Reply'}
+                                                            {hiddenReplies.has(feedback.id) ? <><IconEye className="w-3.5 h-3.5 inline mr-0.5" /> Show Reply</> : <><IconHide className="w-3.5 h-3.5 inline mr-0.5" /> Hide Reply</>}
                                                         </button>
                                                     )}
                                                     </>
@@ -980,7 +981,7 @@ export default function Dashboard() {
                                                         />
                                                         {feedback.has_email && (
                                                             <p className="text-xs text-blue-100">
-                                                                📧 This reply will be emailed to the customer from ReviewDock
+                                                                <IconMail className="w-3.5 h-3.5 inline mr-1" /> This reply will be emailed to the customer from ReviewDock
                                                             </p>
                                                         )}
                                                         <div className="flex gap-2 mt-2">
@@ -995,7 +996,7 @@ export default function Dashboard() {
                                                                     opacity: (!replyText.trim() || replySending) ? 0.5 : 1,
                                                                 }}
                                                             >
-                                                                {replySending ? '⏳ Sending...' : '✓ Send Reply'}
+                                                                {replySending ? 'Sending...' : 'Send Reply'}
                                                             </button>
                                                             <button
                                                                 onClick={() => { setReplyingTo(null); setReplyText('') }}
@@ -1030,7 +1031,7 @@ export default function Dashboard() {
                                         backgroundClip: 'text',
                                     }}
                                 >
-                                    📊 Saved Feedback Analyses
+                                    <><IconChart className="w-5 h-5 inline mr-1" /> Saved Feedback Analyses</>
                                 </h2>
                                 <p className="text-xs text-white/50 mb-4">
                                     Summaries saved in Settings. Click "Analyze" to run AI sentiment analysis.
@@ -1040,7 +1041,7 @@ export default function Dashboard() {
                                 <div className="space-y-3 mb-4">
                                     {savedSummaries.map((summary) => {
                                         const sourceIcons = {
-                                            google_form: '📋', google_review: '⭐', survey: '📝', email: '📧', other: '🔗'
+                                            google_form: 'Form', google_review: 'Review', survey: 'Survey', email: 'Email', other: 'Link'
                                         }
                                         const sourceLabels = {
                                             google_form: 'Google Form', google_review: 'Google Review', survey: 'Survey', email: 'Email', other: 'Other'
@@ -1065,7 +1066,7 @@ export default function Dashboard() {
                                                     onClick={() => summary.is_analyzed ? viewSummaryAnalysis(summary) : null}
                                                 >
                                                     <span className="text-2xl">
-                                                        {sourceIcons[summary.source_type] || '🔗'}
+                                                        {sourceIcons[summary.source_type] || 'External'}
                                                     </span>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
@@ -1097,13 +1098,13 @@ export default function Dashboard() {
                                                                             : '#fbbf24'
                                                                     }}
                                                                 >
-                                                                    {summary.overall_sentiment === 'positive' ? '👍' : summary.overall_sentiment === 'negative' ? '👎' : '🔄'} {summary.overall_sentiment} ({summary.overall_score}%)
+                                                                    {summary.overall_sentiment} ({summary.overall_score}%)
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <p className="text-xs text-white/40 mt-0.5">
                                                             Saved {new Date(summary.created_at).toLocaleDateString()}
-                                                            {summary.is_analyzed && ` • ${summary.total_reviews_found} reviews found • 👍${summary.positive_count} 👎${summary.negative_count}`}
+                                                            {summary.is_analyzed && ` • ${summary.total_reviews_found} reviews found • +${summary.positive_count} −${summary.negative_count}`}
                                                             {summary.analyzed_at && ` • Analyzed ${new Date(summary.analyzed_at).toLocaleDateString()}`}
                                                         </p>
                                                     </div>
@@ -1118,7 +1119,7 @@ export default function Dashboard() {
                                                                     color: '#93c5fd',
                                                                 }}
                                                             >
-                                                                👁️ View
+                                                                <><IconEye className="w-3.5 h-3.5 inline mr-0.5" /> View</>
                                                             </button>
                                                         )}
                                                         <button
@@ -1139,7 +1140,7 @@ export default function Dashboard() {
                                                                     <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
                                                                     Analyzing...
                                                                 </span>
-                                                            ) : summary.is_analyzed ? '🔄 Re-Analyze' : '🤖 Analyze'}
+                                                            ) : summary.is_analyzed ? 'Re-Analyze' : <><IconBot className="w-3.5 h-3.5 inline mr-0.5" /> Analyze</>}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1153,7 +1154,7 @@ export default function Dashboard() {
                                     <div className="mt-4">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-sm font-semibold text-purple-300">
-                                                📊 Analysis Results — {selectedSummary.title}
+                                                <><IconChart className="w-5 h-5 inline mr-1" /> Analysis Results — {selectedSummary.title}</>
                                             </span>
                                             <button
                                                 onClick={() => { setSummaryAnalysis(null); setSelectedSummary(null); setSummaryError(''); }}
@@ -1178,18 +1179,18 @@ export default function Dashboard() {
                                                     summaryAnalysis.overallSentiment === 'negative' ? 'bg-red-500/20 text-red-400' :
                                                     'bg-yellow-500/20 text-yellow-400'
                                                 }`}>
-                                                    {summaryAnalysis.overallSentiment === 'positive' ? '👍 POSITIVE' : 
-                                                     summaryAnalysis.overallSentiment === 'negative' ? '👎 NEGATIVE' : '🔄 MIXED'}
+                                                    {summaryAnalysis.overallSentiment === 'positive' ? 'POSITIVE' : 
+                                                     summaryAnalysis.overallSentiment === 'negative' ? 'NEGATIVE' : 'MIXED'}
                                                 </span>
                                                 <span className=" text-xs text-white/50">Score: {summaryAnalysis.overallScore}/100</span>
                                                 {summaryAnalysis.accuracy && (
-                                                    <span className="text-xs text-white/40 ml-auto">🎯 {summaryAnalysis.accuracy}% accuracy</span>
+                                                    <span className="text-xs text-white/40 ml-auto"><IconTarget className="w-3.5 h-3.5 inline mr-0.5" /> {summaryAnalysis.accuracy}% accuracy</span>
                                                 )}
                                             </div>
                                             <p className="text-sm text-white/80">{summaryAnalysis.overallSummary}</p>
                                             {summaryAnalysis.averageRating && (
                                                 <p className="text-xs text-white/50 mt-2">
-                                                    ⭐ Average Rating: {summaryAnalysis.averageRating}/5 • {summaryAnalysis.totalFound} reviews found
+                                                    <><IconStar className="w-3.5 h-3.5 inline mr-0.5 text-yellow-400" /> Average Rating: {summaryAnalysis.averageRating}/5</> • {summaryAnalysis.totalFound} reviews found
                                                 </p>
                                             )}
                                         </div>
@@ -1215,7 +1216,7 @@ export default function Dashboard() {
                                         {/* Sentiment Distribution */}
                                         {summaryAnalysis.sentimentDistribution && (
                                             <div className="p-3 rounded-xl mb-3" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                                                <h4 className="text-xs font-semibold text-white/60 mb-2">📈 Rating Distribution</h4>
+                                                <h4 className="text-xs font-semibold text-white/60 mb-2"><IconChart className="w-4 h-4 inline mr-0.5" /> Rating Distribution</h4>
                                                 <div className="space-y-1.5">
                                                     {[
                                                         { label: '5 ★', key: 'veryPositive', color: '#22c55e' },
@@ -1263,7 +1264,7 @@ export default function Dashboard() {
                                             {/* Positive Points */}
                                             {summaryAnalysis.topPositivePoints?.length > 0 && (
                                                 <div className="p-3 rounded-xl" style={{ background: 'rgba(34, 197, 94, 0.06)', border: '1px solid rgba(34, 197, 99, 0.15)' }}>
-                                                    <h4 className="text-xs font-semibold text-green-400 mb-2">👍 Strengths</h4>
+                                                    <h4 className="text-xs font-semibold text-green-400 mb-2">Strengths</h4>
                                                     <ul className="space-y-1">
                                                         {summaryAnalysis.topPositivePoints.map((p, i) => (
                                                             <li key={i} className="text-xs text-white/70 flex items-start gap-1">
@@ -1276,7 +1277,7 @@ export default function Dashboard() {
                                             {/* Negative Points */}
                                             {summaryAnalysis.topNegativePoints?.length > 0 && (
                                                 <div className="p-3 rounded-xl" style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                                                    <h4 className="text-xs font-semibold text-red-400 mb-2">👎 Needs Improvement</h4>
+                                                    <h4 className="text-xs font-semibold text-red-400 mb-2">Needs Improvement</h4>
                                                     <ul className="space-y-1">
                                                         {summaryAnalysis.topNegativePoints.map((p, i) => (
                                                             <li key={i} className="text-xs text-white/70 flex items-start gap-1">
@@ -1305,7 +1306,7 @@ export default function Dashboard() {
                                         {/* Individual Feedbacks */}
                                         {summaryAnalysis.feedbacks?.length > 0 && (
                                             <div className="p-3 rounded-xl" style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                                                <h4 className="text-xs font-semibold text-white/70 mb-2">📝 Individual Reviews ({summaryAnalysis.feedbacks.length})</h4>
+                                                <h4 className="text-xs font-semibold text-white/70 mb-2"><IconDoc className="w-4 h-4 inline mr-0.5" /> Individual Reviews ({summaryAnalysis.feedbacks.length})</h4>
                                                 <div className="space-y-2 max-h-72 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
                                                     {summaryAnalysis.feedbacks.map((fb, i) => (
                                                         <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
@@ -1313,7 +1314,7 @@ export default function Dashboard() {
                                                                 fb.sentiment === 'positive' ? 'text-green-400' :
                                                                 fb.sentiment === 'negative' ? 'text-red-400' : 'text-yellow-400'
                                                             }`}>
-                                                                {fb.sentiment === 'positive' ? '👍' : fb.sentiment === 'negative' ? '👎' : '😐'}
+                                                                {fb.sentiment === 'positive' ? '+' : fb.sentiment === 'negative' ? '−' : '·'}
                                                             </span>
                                                             <div className="flex-1 min-w-0">
                                                                 <p className="text-xs text-white/70 line-clamp-2">{fb.text || fb.summary}</p>
@@ -1322,7 +1323,7 @@ export default function Dashboard() {
                                                                         fb.sentiment === 'positive' ? 'text-green-400/70' :
                                                                         fb.sentiment === 'negative' ? 'text-red-400/70' : 'text-yellow-400/70'
                                                                     }`}>{fb.sentiment}</span>
-                                                                    {fb.rating && <span className="text-xs text-yellow-400/60">{'⭐'.repeat(fb.rating)}</span>}
+                                                                    {fb.rating && <span className="text-xs text-yellow-400/60 inline-flex"><IconStar className="w-3 h-3" /><span className="ml-0.5">{fb.rating}/5</span></span>}
                                                                     {fb.confidence && <span className="text-xs text-white/30">{fb.confidence}% confidence</span>}
                                                                 </div>
                                                             </div>
@@ -1342,7 +1343,7 @@ export default function Dashboard() {
                                 {/* Summary Error */}
                                 {summaryError && (
                                     <div className="p-3 rounded-xl mt-3" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                                        <p className="text-xs text-red-400">⚠️ {summaryError}</p>
+                                        <p className="text-xs text-red-400"><IconAlert className="w-3.5 h-3.5 inline mr-0.5" /> {summaryError}</p>
                                     </div>
                                 )}
 
