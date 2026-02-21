@@ -239,30 +239,31 @@ export default function Analytics() {
 
                 {/* Custom Date Range */}
                 {showCustom && (
-                    <div className="p-5 mb-6 rounded-2xl" style={glassCard}>
-                        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4">Custom range</p>
+                    <div className="p-5 mb-6 rounded-2xl relative z-[100]" style={glassCard}>
+                        <p className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-4">Custom range</p>
                         <div className="flex flex-wrap items-end gap-5">
-                            <div className="min-w-[160px]">
-                                <label className="block text-xs font-medium text-white/70 mb-2">From date</label>
-                                    <DatePicker
-                                        selected={startDate}
-                                        onChange={(date) => setStartDate(date)}
-                                        selectsStart
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        maxDate={new Date()}
-                                        className="w-full px-3 py-2.5 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                        style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
-                                        dateFormat="MMM d, yyyy"
-                                        showYearDropdown
-                                        scrollableYearDropdown
-                                        yearDropdownItemNumber={5}
-                                        popperClassName="analytics-datepicker-popper"
-                                        calendarClassName="analytics-datepicker-calendar"
-                                    />
+                            <div className="min-w-[180px]">
+                                <label className="block text-sm font-semibold text-white mb-2">From date</label>
+                                <DatePicker
+                                    selected={startDate}
+                                    onChange={(date) => setStartDate(date)}
+                                    selectsStart
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    maxDate={new Date()}
+                                    className="analytics-date-input w-full px-4 py-3 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    dateFormat="MMM d, yyyy"
+                                    showYearDropdown
+                                    scrollableYearDropdown
+                                    yearDropdownItemNumber={5}
+                                    popperClassName="analytics-datepicker-popper"
+                                    calendarClassName="analytics-datepicker-calendar"
+                                    popperPlacement="bottom-start"
+                                    popperModifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
+                                />
                             </div>
-                            <div className="min-w-[160px]">
-                                <label className="block text-xs font-medium text-white/70 mb-2">To date</label>
+                            <div className="min-w-[180px]">
+                                <label className="block text-sm font-semibold text-white mb-2">To date</label>
                                 <DatePicker
                                     selected={endDate}
                                     onChange={(date) => setEndDate(date)}
@@ -271,14 +272,15 @@ export default function Analytics() {
                                     endDate={endDate}
                                     minDate={startDate}
                                     maxDate={new Date()}
-                                    className="w-full px-3 py-2.5 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                    style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                                    className="analytics-date-input w-full px-4 py-3 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                                     dateFormat="MMM d, yyyy"
                                     showYearDropdown
                                     scrollableYearDropdown
                                     yearDropdownItemNumber={5}
                                     popperClassName="analytics-datepicker-popper"
                                     calendarClassName="analytics-datepicker-calendar"
+                                    popperPlacement="bottom-start"
+                                    popperModifiers={[{ name: 'offset', options: { offset: [0, 4] } }]}
                                 />
                             </div>
                             <button
