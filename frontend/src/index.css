@@ -1,0 +1,199 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    min-height: 100vh;
+    font-family: 'Inter', system-ui, sans-serif;
+}
+
+body {
+    background: #000000;
+    background-attachment: fixed;
+    color: #ffffff;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.4);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.6);
+}
+
+/* Glass effect */
+.glass {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gradient text */
+.gradient-text {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Star rating styles */
+.star {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.star:hover {
+    transform: scale(1.2);
+}
+
+.star.active {
+    color: #fbbf24;
+}
+
+.star.inactive {
+    color: #d1d5db;
+}
+
+/* Button hover effect */
+.btn-primary {
+    @apply bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl;
+    @apply hover:from-blue-600 hover:to-purple-700 transition-all duration-300;
+    @apply shadow-lg hover:shadow-xl hover:-translate-y-0.5;
+}
+
+.btn-secondary {
+    @apply bg-white text-gray-700 font-semibold py-3 px-6 rounded-xl border border-gray-200;
+    @apply hover:bg-gray-50 transition-all duration-300 shadow-soft;
+}
+
+/* Card styles */
+.card {
+    @apply bg-white rounded-2xl shadow-soft p-6;
+}
+
+/* Input styles */
+.input {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white;
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+    @apply transition-all duration-200;
+    color: #000000 !important;
+}
+
+.input:focus {
+    @apply shadow-glow;
+}
+
+/* Ensure input and textarea text are visible */
+input.input,
+textarea.input {
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
+    caret-color: #000000 !important;
+    background-color: #ffffff !important;
+}
+
+input.input::placeholder,
+textarea.input::placeholder {
+    color: #999999;
+    opacity: 1;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fadeIn {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes pulse-glow {
+
+    0%,
+    100% {
+        box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    }
+
+    50% {
+        box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+    }
+}
+
+.animate-pulse-glow {
+    animation: pulse-glow 2s infinite;
+}
+
+/* Print Styles - Only show QR code when printing */
+@media print {
+
+    /* Hide everything by default */
+    body {
+        background: white !important;
+    }
+
+    /* Hide navigation, headers, buttons, etc */
+    .no-print,
+    nav,
+    header,
+    .btn-primary,
+    .btn-secondary,
+    aside {
+        display: none !important;
+    }
+
+    /* Show only the print area */
+    .print-only-content {
+        display: block !important;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: none !important;
+        border: 2px solid #000;
+        padding: 20px;
+    }
+
+    /* Make QR image larger for print */
+    .print-only-content img {
+        width: 300px !important;
+        height: 300px !important;
+    }
+
+    /* Hide tips section */
+    .bg-blue-50 {
+        display: none !important;
+    }
+
+    /* Hide card wrapper styling */
+    .card {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+}

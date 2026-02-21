@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Alerts</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">📊</div>
+            <h1>Feedback Alerts</h1>
+        </header>
+
+        <!-- Login Form (shown when not logged in) -->
+        <div id="loginSection" class="section hidden">
+            <h2>Connect Your Account</h2>
+            <form id="loginForm">
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+            <p id="loginError" class="error hidden"></p>
+        </div>
+
+        <!-- Dashboard (shown when logged in) -->
+        <div id="dashboardSection" class="section hidden">
+            <div class="business-name" id="businessName">Loading...</div>
+
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalCount">-</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card positive">
+                    <div class="stat-value" id="positiveCount">-</div>
+                    <div class="stat-label">Positive</div>
+                </div>
+                <div class="stat-card negative">
+                    <div class="stat-value" id="negativeCount">-</div>
+                    <div class="stat-label">Negative</div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button id="openDashboard" class="btn-primary">
+                    📊 Open Dashboard
+                </button>
+                <button id="refreshBtn" class="btn-secondary">
+                    🔄 Refresh
+                </button>
+            </div>
+
+            <!-- Status -->
+            <div class="status" id="status">
+                <span class="status-dot"></span>
+                Live monitoring active
+            </div>
+
+            <!-- Logout -->
+            <button id="logoutBtn" class="btn-link">Logout</button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingSection" class="section">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

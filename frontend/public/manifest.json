@@ -1,0 +1,16 @@
+{
+    "name": "ReviewDock",
+    "short_name": "ReviewDock",
+    "description": "Smart review management for modern businesses",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#6366f1",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}
