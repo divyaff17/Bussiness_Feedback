@@ -927,18 +927,18 @@ export default function Dashboard() {
                                                                 setReplyingTo(feedback.id)
                                                                 setReplyText(feedback.owner_reply || '')
                                                             }}
-                                                            className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                                                            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg transition-all font-medium"
                                                             style={{
                                                                 background: 'rgba(59, 130, 244, 0.15)',
                                                                 border: '1px solid rgba(59, 110, 246, 0.3)',
                                                                 color: '#93c5fd',
                                                             }}
                                                         >
-                                                            {feedback.owner_reply ? <><IconEdit className="w-3.5 h-3.5 inline mr-0.5" /> Edit Reply</> : <><IconReply className="w-3.5 h-3.5 inline mr-0.5" /> Reply</>}
-                                                            <span title="Reply will be emailed to customer" className="ml-1 inline"><IconMail className="w-3.5 h-3.5" /></span>
+                                                            {feedback.owner_reply ? <><IconEdit className="w-4 h-4 shrink-0" /> Edit Reply</> : <><IconReply className="w-4 h-4 shrink-0" /> Reply</>}
+                                                            <span title="Reply will be emailed to customer"><IconMail className="w-3.5 h-3.5 shrink-0 opacity-80" /></span>
                                                         </button>
                                                     ) : (
-                                                        <span className="text-xs px-3 py-1.5 text-white/40 italic">
+                                                        <span className="text-xs px-3 py-2 text-white/40 italic">
                                                             No email provided
                                                         </span>
                                                     )}
@@ -955,14 +955,14 @@ export default function Dashboard() {
                                                                     return next
                                                                 })
                                                             }}
-                                                            className="text-xs px-3 py-1.5 rounded-lg transition-all"
+                                                            className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg transition-all font-medium"
                                                             style={{
                                                                 background: hiddenReplies.has(feedback.id) ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.06)',
                                                                 border: `1px solid ${hiddenReplies.has(feedback.id) ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
                                                                 color: hiddenReplies.has(feedback.id) ? '#93c5fd' : 'rgba(255, 255, 255, 0.5)',
                                                             }}
                                                         >
-                                                            {hiddenReplies.has(feedback.id) ? <><IconEye className="w-3.5 h-3.5 inline mr-0.5" /> Show Reply</> : <><IconHide className="w-3.5 h-3.5 inline mr-0.5" /> Hide Reply</>}
+                                                            {hiddenReplies.has(feedback.id) ? <><IconEye className="w-4 h-4 shrink-0" /> Show Reply</> : <><IconHide className="w-4 h-4 shrink-0" /> Hide Reply</>}
                                                         </button>
                                                     )}
                                                     </>
@@ -1040,9 +1040,6 @@ export default function Dashboard() {
                                 {/* Summary Cards */}
                                 <div className="space-y-3 mb-4">
                                     {savedSummaries.map((summary) => {
-                                        const sourceIcons = {
-                                            google_form: 'Form', google_review: 'Review', survey: 'Survey', email: 'Email', other: 'Link'
-                                        }
                                         const sourceLabels = {
                                             google_form: 'Google Form', google_review: 'Google Review', survey: 'Survey', email: 'Email', other: 'Other'
                                         }
@@ -1065,22 +1062,20 @@ export default function Dashboard() {
                                                     }}
                                                     onClick={() => summary.is_analyzed ? viewSummaryAnalysis(summary) : null}
                                                 >
-                                                    <span className="text-2xl">
-                                                        {sourceIcons[summary.source_type] || 'External'}
+                                                    <span 
+                                                        className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0"
+                                                        style={{
+                                                            background: 'rgba(139, 92, 246, 0.2)',
+                                                            color: '#c4b5fd',
+                                                            border: '1px solid rgba(139, 92, 246, 0.3)',
+                                                        }}
+                                                    >
+                                                        {sourceLabels[summary.source_type] || 'External'}
                                                     </span>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="text-sm font-medium text-white/90">
                                                                 {summary.title}
-                                                            </span>
-                                                            <span 
-                                                                className="text-xs px-2 py-0.5 rounded-full"
-                                                                style={{
-                                                                    background: 'rgba(139, 52, 246, 0.15)',
-                                                                    color: '#c4b5n'
-                                                                }}
-                                                            >
-                                                                {sourceLabels[summary.source_type] || 'External'}
                                                             </span>
                                                             {summary.is_analyzed && (
                                                                 <span 
@@ -1112,20 +1107,20 @@ export default function Dashboard() {
                                                         {summary.is_analyzed && (
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); viewSummaryAnalysis(summary); }}
-                                                                className="px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
+                                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
                                                                 style={{
                                                                     background: 'rgba(59, 130, 246, 0.2)',
                                                                     border: '1px solid rgba(59, 130, 246, 0.4)',
                                                                     color: '#93c5fd',
                                                                 }}
                                                             >
-                                                                <><IconEye className="w-3.5 h-3.5 inline mr-0.5" /> View</>
+                                                                <IconEye className="w-4 h-4 shrink-0" /> View
                                                             </button>
                                                         )}
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); analyzeSavedSummary(summary); }}
                                                             disabled={summaryAnalyzing && selectedSummary?.id === summary.id}
-                                                            className="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
+                                                            className="inline-flex items-center gap-1.5 whitespace-nowrap px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-300"
                                                             style={{
                                                                 background: (summaryAnalyzing && selectedSummary?.id === summary.id)
                                                                     ? 'rgba(139, 92, 246, 0.2)'
@@ -1136,11 +1131,11 @@ export default function Dashboard() {
                                                             }}
                                                         >
                                                             {summaryAnalyzing && selectedSummary?.id === summary.id ? (
-                                                                <span className="flex items-center gap-2">
-                                                                    <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
+                                                                <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                                                                    <span className="animate-spin rounded-full h-3 w-3 border-2 border-t-transparent shrink-0" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
                                                                     Analyzing...
                                                                 </span>
-                                                            ) : summary.is_analyzed ? 'Re-Analyze' : <><IconBot className="w-3.5 h-3.5 inline mr-0.5" /> Analyze</>}
+                                                            ) : summary.is_analyzed ? <><IconBot className="w-4 h-4 shrink-0" /> Re-Analyze</> : <><IconBot className="w-4 h-4 shrink-0" /> Analyze</>}
                                                         </button>
                                                     </div>
                                                 </div>

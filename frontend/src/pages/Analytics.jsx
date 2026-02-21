@@ -237,12 +237,13 @@ export default function Analytics() {
                     </div>
                 </div>
 
-                {/* Custom Date Picker */}
+                {/* Custom Date Range */}
                 {showCustom && (
-                    <div className="p-4 mb-6" style={glassCard}>
-                            <div className="flex flex-wrap items-center gap-4">
-                                <div>
-                                    <label className="block text-xs text-white/60 mb-1">From Date</label>
+                    <div className="p-5 mb-6 rounded-2xl" style={glassCard}>
+                        <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-4">Custom range</p>
+                        <div className="flex flex-wrap items-end gap-5">
+                            <div className="min-w-[160px]">
+                                <label className="block text-xs font-medium text-white/70 mb-2">From date</label>
                                     <DatePicker
                                         selected={startDate}
                                         onChange={(date) => setStartDate(date)}
@@ -250,44 +251,49 @@ export default function Analytics() {
                                         startDate={startDate}
                                         endDate={endDate}
                                         maxDate={new Date()}
-                                        className="px-3 py-2 rounded-lg text-white text-sm"
-                                        style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)' }}
+                                        className="w-full px-3 py-2.5 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                        style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
                                         dateFormat="MMM d, yyyy"
                                         showYearDropdown
                                         scrollableYearDropdown
                                         yearDropdownItemNumber={5}
+                                        popperClassName="analytics-datepicker-popper"
+                                        calendarClassName="analytics-datepicker-calendar"
                                     />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-white/60 mb-1">To Date</label>
-                                    <DatePicker
-                                        selected={endDate}
-                                        onChange={(date) => setEndDate(date)}
-                                        selectsEnd
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        minDate={startDate}
-                                        maxDate={new Date()}
-                                        className="px-3 py-2 rounded-lg text-white text-sm"
-                                        style={{ background: 'rgba(255, 255, 255, 0.1)', border: '1px solid rgba(255, 255, 255, 0.2)' }}
-                                        dateFormat="MMM d, yyyy"
-                                        showYearDropdown
-                                        scrollableYearDropdown
-                                        yearDropdownItemNumber={5}
-                                    />
-                                </div>
-                                <button
-                                    onClick={fetchAnalytics}
-                                    className="px-4 py-2 rounded-xl text-sm font-medium mt-5 transition-all duration-300"
-                                    style={{
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        color: 'white',
-                                    }}
-                                >
-                                    Apply
-                                </button>
                             </div>
+                            <div className="min-w-[160px]">
+                                <label className="block text-xs font-medium text-white/70 mb-2">To date</label>
+                                <DatePicker
+                                    selected={endDate}
+                                    onChange={(date) => setEndDate(date)}
+                                    selectsEnd
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    minDate={startDate}
+                                    maxDate={new Date()}
+                                    className="w-full px-3 py-2.5 rounded-lg text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                                    dateFormat="MMM d, yyyy"
+                                    showYearDropdown
+                                    scrollableYearDropdown
+                                    yearDropdownItemNumber={5}
+                                    popperClassName="analytics-datepicker-popper"
+                                    calendarClassName="analytics-datepicker-calendar"
+                                />
+                            </div>
+                            <button
+                                onClick={fetchAnalytics}
+                                className="px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 shrink-0"
+                                style={{
+                                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                    color: 'white',
+                                    border: '1px solid rgba(102, 126, 234, 0.5)',
+                                }}
+                            >
+                                Apply
+                            </button>
                         </div>
+                    </div>
                 )}
 
                 {loading ? (
