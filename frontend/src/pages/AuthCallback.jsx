@@ -6,11 +6,21 @@ import { useAuth } from '../hooks/useAuth'
 export default function AuthCallback() {
     const [status, setStatus] = useState('Processing sign-in...')
     const navigate = useNavigate()
-    const { magicLinkAuth } = useAuth()
+    const { magicLinkAuth, user } = useAuth()
 
     useEffect(() => {
         handleCallback()
     }, [])
+
+    // Watch for user state change and redirect when authenticated
+    useEffect(() => {
+        if (user) {
+            setStatus('Welcome back! Redirecting to dashboard...')
+            setTimeout(() => {
+                window.location.href = '/dashboard'
+            }, 500)
+        }
+    }, [user])
 
     const handleCallback = async () => {
         try {
@@ -31,12 +41,12 @@ export default function AuthCallback() {
             }
 
             if (data.session) {
-                const user = data.session.user
+                const sessionUser = data.session.user
                 const userData = {
-                    email: user.email,
-                    name: user.user_metadata?.full_name || user.user_metadata?.name || user.email.split('@')[0],
-                    picture: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-                    googleId: user.user_metadata?.sub || user.id,
+                    email: sessionUser.email,
+                    name: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.email.split('@')[0],
+                    picture: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || null,
+                    googleId: sessionUser.user_metadata?.sub || sessionUser.id,
                 }
 
                 setStatus('Signing you in...')
@@ -47,10 +57,8 @@ export default function AuthCallback() {
                     if (result.needsSignup) {
                         // New user - redirect to signup with data prefilled
                         navigate('/signup', { state: { googleData: userData } })
-                    } else {
-                        // Existing user - go directly to dashboard
-                        navigate('/dashboard')
                     }
+                    // For existing users, the useEffect watching 'user' will handle redirect
                 } catch (err) {
                     console.error('Backend auth error:', err)
                     setStatus('Failed to complete sign-in. Redirecting...')
